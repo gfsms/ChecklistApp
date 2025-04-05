@@ -37,11 +37,15 @@ import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
  *
  * @param viewModel ViewModel que gestiona el estado de la inspección
  * @param onProceed Callback para avanzar a la siguiente sección
+ * @param onNavigateToCamera Callback para navegar a la pantalla de cámara
+ * @param onNavigateToPhotos Callback para navegar a la pantalla de gestión de fotos
  */
 @Composable
 fun ChecklistScreen(
     viewModel: NewInspectionViewModel,
-    onProceed: () -> Unit
+    onProceed: () -> Unit,
+    onNavigateToCamera: (String) -> Unit = {},
+    onNavigateToPhotos: (String) -> Unit = {}
 ) {
     // Estado de carga
     if (viewModel.isLoading) {
@@ -131,6 +135,14 @@ fun ChecklistScreen(
                     question = question,
                     onAnswerChange = { q, answer ->
                         viewModel.updateQuestionAnswer(q, answer)
+                    },
+                    onAddPhoto = { q ->
+                        // Navegamos a la pantalla de cámara con el ID de la pregunta
+                        onNavigateToCamera(q.id)
+                    },
+                    onViewPhotos = { q ->
+                        // Navegamos a la pantalla de fotos con el ID de la pregunta
+                        onNavigateToPhotos(q.id)
                     }
                 )
 

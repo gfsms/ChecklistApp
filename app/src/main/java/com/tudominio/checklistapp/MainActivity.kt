@@ -12,7 +12,10 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             ChecklistAppTheme {
+                // Crear un NavController para manejar la navegación
                 val navController = rememberNavController()
+
+                // Configurar el grafo de navegación con el NavController
                 SetupNavGraph(navController = navController)
             }
         }

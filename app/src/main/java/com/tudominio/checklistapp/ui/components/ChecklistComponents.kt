@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Camera
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.tudominio.checklistapp.data.model.Answer
 import com.tudominio.checklistapp.data.model.InspectionQuestion
+import com.tudominio.checklistapp.data.model.Photo
 import com.tudominio.checklistapp.ui.theme.Green
 import com.tudominio.checklistapp.ui.theme.Red
 
@@ -55,12 +57,16 @@ import com.tudominio.checklistapp.ui.theme.Red
  *
  * @param question La pregunta a mostrar
  * @param onAnswerChange Callback que se invoca cuando cambia la respuesta
+ * @param onAddPhoto Callback para abrir la pantalla de captura de foto
+ * @param onViewPhotos Callback para ver las fotos existentes
  * @param modifier Modificador opcional para personalizar el componente
  */
 @Composable
 fun ChecklistQuestionItem(
     question: InspectionQuestion,
     onAnswerChange: (InspectionQuestion, Answer) -> Unit,
+    onAddPhoto: (InspectionQuestion) -> Unit = {},
+    onViewPhotos: (InspectionQuestion) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showCommentSection by remember { mutableStateOf(false) }
@@ -73,6 +79,10 @@ fun ChecklistQuestionItem(
         showCommentSection = true
         comment = question.answer?.comment ?: ""
     }
+
+    // Comprobamos si la pregunta tiene fotos
+    val hasPhotos = question.answer?.photos?.isNotEmpty() == true
+    val photoCount = question.answer?.photos?.size ?: 0
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -132,7 +142,17 @@ fun ChecklistQuestionItem(
                         // Si ya hay un comentario existente, lo mantenemos
                         val existingComment = question.answer?.comment ?: ""
                         comment = existingComment
-                        onAnswerChange(question, Answer(isConform = false, comment = existingComment))
+
+                        // Mantenemos las fotos existentes si las hay
+                        val existingPhotos = question.answer?.photos ?: emptyList()
+                        onAnswerChange(
+                            question,
+                            Answer(
+                                isConform = false,
+                                comment = existingComment,
+                                photos = existingPhotos
+                            )
+                        )
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -158,13 +178,14 @@ fun ChecklistQuestionItem(
                         value = comment,
                         onValueChange = { newComment ->
                             comment = newComment
-                            // Solo actualizamos el Answer cuando el usuario termine de escribir
-                            // o cuando el comentario cambie significativamente
+                            // Mantenemos las fotos existentes si las hay
+                            val existingPhotos = question.answer?.photos ?: emptyList()
                             onAnswerChange(
                                 question,
                                 Answer(
                                     isConform = false,
-                                    comment = newComment
+                                    comment = newComment,
+                                    photos = existingPhotos
                                 )
                             )
                         },
@@ -176,21 +197,46 @@ fun ChecklistQuestionItem(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Botón para tomar foto
-                    Button(
-                        onClick = { /* Implementaremos la captura de fotos más adelante */ },
-                        modifier = Modifier.align(Alignment.End),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondary
-                        )
+                    // Botones para gestionar fotos
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Tomar foto",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text("Agregar Foto")
+                        // Botón para tomar foto
+                        Button(
+                            onClick = { onAddPhoto(question) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Agregar Foto",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text("Agregar Foto")
+                        }
+
+                        // Botón para ver fotos (solo si hay fotos)
+                        if (hasPhotos) {
+                            Button(
+                                onClick = { onViewPhotos(question) },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoLibrary,
+                                    contentDescription = "Ver Fotos",
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.size(8.dp))
+                                Text("Ver Fotos ($photoCount)")
+                            }
+                        }
                     }
                 }
             }

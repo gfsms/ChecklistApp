@@ -8,6 +8,9 @@ import com.tudominio.checklistapp.data.model.Answer
 import com.tudominio.checklistapp.data.model.Inspection
 import com.tudominio.checklistapp.data.model.InspectionItem
 import com.tudominio.checklistapp.data.model.InspectionQuestion
+import com.tudominio.checklistapp.data.model.Photo
+import java.time.LocalDateTime
+import java.util.UUID
 
 /**
  * ViewModel que gestiona el estado y la lógica de la pantalla de Nueva Inspección.
@@ -132,20 +135,20 @@ class NewInspectionViewModel : ViewModel() {
         val items = listOf(
             InspectionItem(
                 id = "item1",
-                name = "Item 1",
+                name = "Sistema Hidráulico",
                 questions = listOf(
-                    InspectionQuestion(id = "item1_q1", text = "Pregunta 1"),
-                    InspectionQuestion(id = "item1_q2", text = "Pregunta 2"),
-                    InspectionQuestion(id = "item1_q3", text = "Pregunta 3")
+                    InspectionQuestion(id = "item1_q1", text = "¿Hay fugas de aceite en mangueras o conexiones?"),
+                    InspectionQuestion(id = "item1_q2", text = "¿Los cilindros hidráulicos presentan desgaste o daños?"),
+                    InspectionQuestion(id = "item1_q3", text = "¿El nivel de aceite hidráulico es adecuado?")
                 )
             ),
             InspectionItem(
                 id = "item2",
-                name = "Item 2",
+                name = "Sistema Eléctrico",
                 questions = listOf(
-                    InspectionQuestion(id = "item2_q1", text = "Pregunta 1"),
-                    InspectionQuestion(id = "item2_q2", text = "Pregunta 2"),
-                    InspectionQuestion(id = "item2_q3", text = "Pregunta 3")
+                    InspectionQuestion(id = "item2_q1", text = "¿Las luces de trabajo funcionan correctamente?"),
+                    InspectionQuestion(id = "item2_q2", text = "¿El alternador carga adecuadamente la batería?"),
+                    InspectionQuestion(id = "item2_q3", text = "¿El cableado presenta deterioro o daños?")
                 )
             )
         )
@@ -185,8 +188,18 @@ class NewInspectionViewModel : ViewModel() {
         val questionIndex = questions.indexOfFirst { it.id == question.id }
 
         if (questionIndex != -1) {
+            // Si la pregunta ya tenía respuesta, conservamos sus fotos
+            val existingPhotos = questions[questionIndex].answer?.photos ?: emptyList()
+
+            // Solo actualizamos las fotos si la nueva respuesta no las incluye
+            val updatedAnswer = if (answer.photos.isEmpty()) {
+                answer.copy(photos = existingPhotos)
+            } else {
+                answer
+            }
+
             // Actualizamos la pregunta con la nueva respuesta
-            questions[questionIndex] = questions[questionIndex].copy(answer = answer)
+            questions[questionIndex] = questions[questionIndex].copy(answer = updatedAnswer)
 
             // Creamos un nuevo ítem con las preguntas actualizadas
             val updatedItem = currentItem.copy(questions = questions)
@@ -197,6 +210,142 @@ class NewInspectionViewModel : ViewModel() {
             // Actualizamos la inspección completa
             inspection = inspection.copy(items = currentItems)
         }
+    }
+
+    /**
+     * Añade una foto a una pregunta específica.
+     *
+     * @param questionId ID de la pregunta a la que se añade la foto
+     * @param photoUri URI de la foto tomada
+     */
+    fun addPhotoToQuestion(questionId: String, photoUri: String) {
+        val question = getQuestionById(questionId) ?: return
+
+        // Creamos un nuevo objeto Photo
+        val newPhoto = Photo(
+            uri = photoUri,
+            timestamp = LocalDateTime.now()
+        )
+
+        // Obtenemos la respuesta actual o creamos una nueva si no existe
+        val currentAnswer = question.answer ?: Answer(isConform = false)
+
+        // Añadimos la nueva foto a la lista existente
+        val updatedPhotos = currentAnswer.photos.toMutableList().apply {
+            add(newPhoto)
+        }
+
+        // Creamos una respuesta actualizada con la nueva foto
+        val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
+
+        // Actualizamos la pregunta con la nueva respuesta
+        updateQuestionWithAnswer(questionId, updatedAnswer)
+    }
+
+    /**
+     * Elimina una foto de una pregunta específica.
+     *
+     * @param questionId ID de la pregunta de la que se elimina la foto
+     * @param photo La foto a eliminar
+     */
+    fun removePhotoFromQuestion(questionId: String, photo: Photo) {
+        val question = getQuestionById(questionId) ?: return
+
+        // Obtenemos la respuesta actual
+        val currentAnswer = question.answer ?: return
+
+        // Eliminamos la foto de la lista
+        val updatedPhotos = currentAnswer.photos.filter { it.id != photo.id }
+
+        // Creamos una respuesta actualizada sin la foto eliminada
+        val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
+
+        // Actualizamos la pregunta con la nueva respuesta
+        updateQuestionWithAnswer(questionId, updatedAnswer)
+    }
+
+    /**
+     * Actualiza una foto con los dibujos realizados.
+     *
+     * @param questionId ID de la pregunta que contiene la foto
+     * @param photoId ID de la foto a actualizar
+     * @param drawingUri URI de la imagen con los dibujos
+     */
+    fun updatePhotoWithDrawing(questionId: String, photoId: String, drawingUri: String) {
+        val question = getQuestionById(questionId) ?: return
+
+        // Obtenemos la respuesta actual
+        val currentAnswer = question.answer ?: return
+
+        // Encontramos la foto a actualizar
+        val photoIndex = currentAnswer.photos.indexOfFirst { it.id == photoId }
+        if (photoIndex == -1) return
+
+        // Obtenemos la foto actual
+        val photo = currentAnswer.photos[photoIndex]
+
+        // Creamos una nueva foto con la información del dibujo
+        val updatedPhoto = photo.copy(
+            hasDrawings = true,
+            drawingUri = drawingUri
+        )
+
+        // Actualizamos la lista de fotos
+        val updatedPhotos = currentAnswer.photos.toMutableList().apply {
+            set(photoIndex, updatedPhoto)
+        }
+
+        // Creamos una respuesta actualizada con la foto modificada
+        val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
+
+        // Actualizamos la pregunta con la nueva respuesta
+        updateQuestionWithAnswer(questionId, updatedAnswer)
+    }
+
+    /**
+     * Actualiza una pregunta con una nueva respuesta.
+     *
+     * @param questionId ID de la pregunta a actualizar
+     * @param answer La nueva respuesta
+     */
+    private fun updateQuestionWithAnswer(questionId: String, answer: Answer) {
+        // Buscamos el ítem y la pregunta
+        val items = inspection.items.toMutableList()
+
+        for (i in items.indices) {
+            val item = items[i]
+            val questions = item.questions.toMutableList()
+
+            val questionIndex = questions.indexOfFirst { it.id == questionId }
+            if (questionIndex != -1) {
+                // Actualizamos la pregunta con la nueva respuesta
+                questions[questionIndex] = questions[questionIndex].copy(answer = answer)
+
+                // Actualizamos el ítem con las preguntas actualizadas
+                items[i] = item.copy(questions = questions)
+
+                // Actualizamos la inspección completa
+                inspection = inspection.copy(items = items)
+                return
+            }
+        }
+    }
+
+    /**
+     * Busca una pregunta por su ID.
+     *
+     * @param questionId ID de la pregunta a buscar
+     * @return La pregunta encontrada o null si no existe
+     */
+    fun getQuestionById(questionId: String): InspectionQuestion? {
+        inspection.items.forEach { item ->
+            item.questions.forEach { question ->
+                if (question.id == questionId) {
+                    return question
+                }
+            }
+        }
+        return null
     }
 
     /**

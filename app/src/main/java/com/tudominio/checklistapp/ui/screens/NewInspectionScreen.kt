@@ -21,7 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -31,9 +31,6 @@ import com.tudominio.checklistapp.ui.components.NumericTextField
 import com.tudominio.checklistapp.ui.components.PrimaryButton
 import com.tudominio.checklistapp.ui.viewmodels.InspectionStage
 import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
-import com.tudominio.checklistapp.ui.screens.ChecklistScreen
-import com.tudominio.checklistapp.ui.screens.CompletedScreen
-import com.tudominio.checklistapp.ui.screens.SummaryScreen
 
 /**
  * Pantalla principal para crear una nueva inspección.
@@ -42,15 +39,23 @@ import com.tudominio.checklistapp.ui.screens.SummaryScreen
  *
  * @param onNavigateBack Función para navegar hacia atrás
  * @param onInspectionCompleted Función que se llama cuando se completa la inspección
+ * @param viewModel ViewModel compartido para esta pantalla
+ * @param onNavigateToCamera Función para navegar a la pantalla de cámara
+ * @param onNavigateToPhotos Función para navegar a la pantalla de gestión de fotos
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NewInspectionScreen(
     onNavigateBack: () -> Unit,
-    onInspectionCompleted: () -> Unit = {}
+    onInspectionCompleted: () -> Unit = {},
+    viewModel: NewInspectionViewModel = viewModel(),
+    onNavigateToCamera: (String) -> Unit = {},
+    onNavigateToPhotos: (String) -> Unit = {}
 ) {
-    // Creamos el ViewModel para esta pantalla
-    val viewModel: NewInspectionViewModel = viewModel()
+    // Agregamos un efecto para debug
+    LaunchedEffect(key1 = true) {
+        println("NewInspectionScreen composición inicial")
+    }
 
     // Función para manejar la navegación hacia atrás
     val handleBackNavigation = {
@@ -105,7 +110,9 @@ fun NewInspectionScreen(
                 InspectionStage.CHECKLIST -> {
                     ChecklistScreen(
                         viewModel = viewModel,
-                        onProceed = { viewModel.proceedToNextStage() }
+                        onProceed = { viewModel.proceedToNextStage() },
+                        onNavigateToCamera = onNavigateToCamera,
+                        onNavigateToPhotos = onNavigateToPhotos
                     )
                 }
                 InspectionStage.SUMMARY -> {
@@ -130,6 +137,11 @@ fun NewInspectionScreen(
  */
 @Composable
 fun InitialInfoForm(viewModel: NewInspectionViewModel) {
+    // Agregamos un efecto para debug
+    LaunchedEffect(key1 = true) {
+        println("InitialInfoForm composición")
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()

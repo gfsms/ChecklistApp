@@ -71,9 +71,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // Comentamos el resto de dependencias para agregarlas conforme avancemos
-    // Descomentar según necesitemos implementar nuevas funcionalidades
-
     // Para iconos extendidos
     implementation(libs.androidx.compose.material.icons.extended)
 
@@ -82,11 +79,11 @@ dependencies {
     // implementation(libs.gson)
 
     // Para imágenes y cámara
-    // implementation(libs.coil.compose)
-    // implementation(libs.accompanist.permissions)
-    // implementation(libs.androidx.camera.camera2)
-    // implementation(libs.androidx.camera.lifecycle)
-    // implementation(libs.androidx.camera.view)
+    implementation(libs.coil.compose)
+    implementation(libs.accompanist.permissions)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     // Para generación de PDF
     // implementation(libs.itextpdf)
