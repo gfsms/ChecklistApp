@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.tudominio.checklistapp.R
 import com.tudominio.checklistapp.ui.components.MenuCardButton
+import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
  * Pantalla principal que muestra las opciones principales de la aplicación:
@@ -37,7 +39,8 @@ import com.tudominio.checklistapp.ui.components.MenuCardButton
 @Composable
 fun HomeScreen(
     onNavigateToNewInspection: () -> Unit = {},
-    onNavigateToHistory: () -> Unit = {}
+    onNavigateToHistory: () -> Unit = {},
+    viewModel: NewInspectionViewModel = viewModel()
 ) {
     Scaffold(
         topBar = {
@@ -96,7 +99,10 @@ fun HomeScreen(
                     MenuCardButton(
                         title = "Nueva Inspección",
                         description = "Iniciar una nueva inspección de equipo. Complete el formulario y registre conformidades y no conformidades.",
-                        onClick = onNavigateToNewInspection
+                        onClick = {
+                            viewModel.resetInspection()
+                            onNavigateToNewInspection()
+                        }
                     )
 
                     // Botón de Revisar Historial

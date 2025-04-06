@@ -409,6 +409,21 @@ class NewInspectionViewModel : ViewModel() {
             }
         }
     }
+
+    /**
+     * Reinicia la inspección a su estado inicial.
+     * Útil cuando se quiere comenzar una nueva inspección.
+     */
+    fun resetInspection() {
+        inspection = Inspection()
+        currentStage = InspectionStage.INITIAL_INFO
+        currentItemIndex = 0
+        equipmentError = false
+        inspectorError = false
+        supervisorError = false
+        horometerError = false
+        isLoading = false
+    }
 }
 
 /**

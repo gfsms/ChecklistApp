@@ -1,6 +1,8 @@
 package com.tudominio.checklistapp.ui.components
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import androidx.compose.foundation.Canvas
@@ -17,33 +19,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.toSize
+import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 
-/**
- * Representa una línea de dibujo con color y puntos.
- */
 data class DrawingLine(
     val color: Color,
     val strokeWidth: Float,
     val points: MutableList<Offset> = mutableListOf()
 )
 
-/**
- * Componente que permite dibujar sobre una imagen.
- *
- * @param imageUri URI de la imagen de fondo
- * @param currentColor Color actual del pincel
- * @param strokeWidth Grosor del pincel
- * @param onBitmapCreated Callback que se llama cuando se genera un nuevo bitmap con los dibujos
- */
 @Composable
 fun DrawingCanvas(
     imageUri: String,
@@ -51,34 +48,50 @@ fun DrawingCanvas(
     strokeWidth: Float = 5f,
     onBitmapCreated: (Bitmap) -> Unit
 ) {
-    // Lista de líneas dibujadas
+    val context = LocalContext.current
     val lines = remember { mutableStateListOf<DrawingLine>() }
-
-    // Línea actual que se está dibujando
     var currentLine by remember { mutableStateOf<DrawingLine?>(null) }
+    var forceRedraw by remember { mutableStateOf(0) }
 
-    // Cargar la imagen de fondo
+    // Para mantener un seguimiento del tamaño real de la imagen
+    var imageSize by remember { mutableStateOf(Size.Zero) }
+    var originalSize by remember { mutableStateOf(Size.Zero) }
+
     val painter = rememberAsyncImagePainter(
-        model = ImageRequest.Builder(LocalContext.current)
+        model = ImageRequest.Builder(context)
             .data(imageUri)
             .build()
     )
 
-    // Contenedor que contiene la imagen y el lienzo de dibujo
     Box(modifier = Modifier.fillMaxSize()) {
         // Imagen de fondo
         Image(
             painter = painter,
             contentDescription = "Imagen para editar",
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coordinates ->
+                    imageSize = coordinates.size.toSize()
+                },
             contentScale = ContentScale.Fit
         )
+
+        // Intentamos obtener el tamaño original de la imagen
+        val originalBitmap = remember(imageUri) {
+            try {
+                getBitmapFromUri(context, imageUri)?.also {
+                    originalSize = Size(it.width.toFloat(), it.height.toFloat())
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
 
         // Lienzo para dibujar
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(currentColor, strokeWidth) {
+                .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             currentLine = DrawingLine(
@@ -93,35 +106,43 @@ fun DrawingCanvas(
                             val current = currentLine
                             if (current != null) {
                                 current.points.add(change.position)
-                                // Forzar una recomposición
-                                currentLine = current
+                                forceRedraw++  // Forzar recomposición
                             }
                         },
                         onDragEnd = {
-                            // Cuando se termina de dibujar, guardamos el bitmap resultante
-                            val bitmap = createBitmapFromCanvas(
-                                300,
-                                300,
-                                null,
-                                lines
-                            )
-                            bitmap?.let { onBitmapCreated(it) }
+                            try {
+                                // Cargamos la imagen original
+                                val bitmap = getBitmapFromUri(context, imageUri)
+                                if (bitmap != null) {
+                                    val scaledBitmap = createBitmapWithScaledDrawings(
+                                        bitmap,
+                                        lines,
+                                        imageSize,
+                                        Size(bitmap.width.toFloat(), bitmap.height.toFloat())
+                                    )
+                                    onBitmapCreated(scaledBitmap)
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     )
                 }
         ) {
-            // Dibujamos todas las líneas guardadas
-            lines.forEach { line ->
-                if (line.points.size > 1) {
-                    for (i in 0 until line.points.size - 1) {
-                        drawLine(
-                            color = line.color,
-                            start = line.points[i],
-                            end = line.points[i + 1],
-                            strokeWidth = line.strokeWidth,
-                            cap = StrokeCap.Round,
-                            pathEffect = null
-                        )
+            // Este dibujo se volverá a ejecutar cada vez que forceRedraw cambie
+            forceRedraw.let {
+                // Dibujamos todas las líneas guardadas
+                lines.forEach { line ->
+                    if (line.points.size > 1) {
+                        for (i in 0 until line.points.size - 1) {
+                            drawLine(
+                                color = line.color,
+                                start = line.points[i],
+                                end = line.points[i + 1],
+                                strokeWidth = line.strokeWidth,
+                                cap = StrokeCap.Round
+                            )
+                        }
                     }
                 }
             }
@@ -129,26 +150,26 @@ fun DrawingCanvas(
     }
 }
 
-/**
- * Crea un bitmap combinando la imagen original con los dibujos realizados.
- */
-private fun createBitmapFromCanvas(
-    width: Int,
-    height: Int,
-    originalBitmap: Bitmap?,
-    lines: List<DrawingLine>
-): Bitmap? {
-    if (width <= 0 || height <= 0) return null
+private fun getBitmapFromUri(context: android.content.Context, uriString: String): Bitmap? {
+    return try {
+        val uri = android.net.Uri.parse(uriString)
+        val inputStream = context.contentResolver.openInputStream(uri)
+        BitmapFactory.decodeStream(inputStream)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
 
-    // Si no tenemos un bitmap original, creamos uno nuevo
-    val bitmap = originalBitmap ?: Bitmap.createBitmap(
-        width,
-        height,
-        Bitmap.Config.ARGB_8888
-    )
-
-    // Canvas para dibujar sobre el bitmap
-    val canvas = android.graphics.Canvas(bitmap)
+private fun createBitmapWithScaledDrawings(
+    originalBitmap: Bitmap,
+    lines: List<DrawingLine>,
+    displaySize: Size,
+    originalSize: Size
+): Bitmap {
+    // Crear una copia del bitmap original para dibujar
+    val resultBitmap = originalBitmap.copy(Bitmap.Config.ARGB_8888, true)
+    val canvas = Canvas(resultBitmap)
 
     // Configurar el pincel para dibujar
     val paint = Paint().apply {
@@ -158,29 +179,39 @@ private fun createBitmapFromCanvas(
         strokeCap = Paint.Cap.ROUND
     }
 
+    // Calcular factores de escala
+    val scaleX = originalSize.width / displaySize.width
+    val scaleY = originalSize.height / displaySize.height
+
     // Dibujar cada línea
     lines.forEach { line ->
         paint.color = line.color.toArgb()
-        paint.strokeWidth = line.strokeWidth
+        paint.strokeWidth = line.strokeWidth * scaleX // Ajustar el ancho del trazo
 
         if (line.points.size > 1) {
             val path = Path()
-            path.moveTo(line.points.first().x, line.points.first().y)
 
+            // Escalar el primer punto
+            val firstPoint = line.points.first()
+            val scaledFirstX = firstPoint.x * scaleX
+            val scaledFirstY = firstPoint.y * scaleY
+            path.moveTo(scaledFirstX, scaledFirstY)
+
+            // Escalar y agregar el resto de puntos
             for (i in 1 until line.points.size) {
-                path.lineTo(line.points[i].x, line.points[i].y)
+                val point = line.points[i]
+                val scaledX = point.x * scaleX
+                val scaledY = point.y * scaleY
+                path.lineTo(scaledX, scaledY)
             }
 
             canvas.drawPath(path, paint)
         }
     }
 
-    return bitmap
+    return resultBitmap
 }
 
-/**
- * Extensión para convertir un Color de Compose a un color entero Android.
- */
 fun Color.toArgb(): Int {
     return android.graphics.Color.argb(
         (alpha * 255).toInt(),

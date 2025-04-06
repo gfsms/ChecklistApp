@@ -11,6 +11,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.tudominio.checklistapp.ui.screens.CameraScreen
 import com.tudominio.checklistapp.ui.screens.DrawingScreen
+import com.tudominio.checklistapp.ui.screens.HistoryScreen
 import com.tudominio.checklistapp.ui.screens.HomeScreen
 import com.tudominio.checklistapp.ui.screens.NewInspectionScreen
 import com.tudominio.checklistapp.ui.screens.PhotoScreen
@@ -79,7 +80,8 @@ fun SetupNavGraph(
                 // Navegación a Historial
                 onNavigateToHistory = {
                     navController.navigate(Screen.History.route)
-                }
+                },
+                viewModel = viewModel
             )
         }
 
@@ -100,9 +102,9 @@ fun SetupNavGraph(
 
         // Pantalla de Historial (por implementar)
         composable(route = Screen.History.route) {
-            // Implementaremos esta pantalla más adelante
-            // Por ahora, simplemente mostrará un placeholder
-            SplashScreen(onSplashFinished = { navController.navigateUp() })
+            HistoryScreen(
+                onNavigateBack = { navController.navigateUp() }
+            )
         }
 
         // Pantalla de Cámara

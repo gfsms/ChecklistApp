@@ -2,6 +2,7 @@ package com.tudominio.checklistapp.ui.screens
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -44,6 +48,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.tudominio.checklistapp.ui.components.DrawingCanvas
+import com.tudominio.checklistapp.ui.theme.Red
 import com.tudominio.checklistapp.utils.FileUtils
 import java.io.File
 import java.io.FileOutputStream
@@ -152,6 +157,36 @@ fun DrawingScreen(
                     .background(MaterialTheme.colorScheme.surfaceVariant)
                     .padding(16.dp)
             ) {
+                // Botón para borrar todos los dibujos
+                Button(
+                    onClick = {
+                        // Simplemente usamos la imagen original como bitmap final
+                        val originalBitmap = getBitmapFromUri(context, photoUri)
+                        if (originalBitmap != null) {
+                            lastBitmap = originalBitmap
+                            // También podemos guardar inmediatamente
+                            val newUri = saveBitmap(context, originalBitmap)
+                            if (newUri != null) {
+                                onDrawingFinished(newUri.toString())
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Red
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Borrar dibujos",
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Borrar dibujos")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 // Selector de colores
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -200,6 +235,20 @@ fun DrawingScreen(
 }
 
 /**
+ * Intenta obtener un Bitmap a partir de un URI
+ */
+private fun getBitmapFromUri(context: android.content.Context, uriString: String): Bitmap? {
+    return try {
+        val uri = android.net.Uri.parse(uriString)
+        val inputStream = context.contentResolver.openInputStream(uri)
+        BitmapFactory.decodeStream(inputStream)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
+
+/**
  * Selector de color para el panel de herramientas.
  */
 @Composable
@@ -229,12 +278,19 @@ private fun saveBitmap(context: Context, bitmap: Bitmap): Uri? {
     try {
         val file = FileUtils.createImageFile(context)
         FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+            // Usamos una mayor calidad para la imagen
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
             out.flush()
         }
-        return FileUtils.getUriForFile(context, file)
+
+        // Asegurarse de que el archivo existe y tiene contenido
+        if (file.exists() && file.length() > 0) {
+            return FileUtils.getUriForFile(context, file)
+        } else {
+            return null
+        }
     } catch (e: IOException) {
         e.printStackTrace()
+        return null
     }
-    return null
 }

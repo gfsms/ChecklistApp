@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import com.tudominio.checklistapp.R
 import com.tudominio.checklistapp.data.model.Photo
 import com.tudominio.checklistapp.ui.theme.Red
 
@@ -182,15 +183,17 @@ fun PhotoScreen(
 
                                 Image(
                                     painter = rememberAsyncImagePainter(
-                                        ImageRequest.Builder(LocalContext.current)
+                                        model = ImageRequest.Builder(LocalContext.current)
                                             .data(data = Uri.parse(imageUri))
+                                            .error(R.drawable.app_logo)
+                                            .placeholder(R.drawable.app_logo)
                                             .build()
                                     ),
                                     contentDescription = "Foto",
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(300.dp),
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Fit
                                 )
 
                                 // Botones de acción flotantes sobre la foto
@@ -327,11 +330,13 @@ fun PhotoThumbnail(
                 painter = rememberAsyncImagePainter(
                     ImageRequest.Builder(LocalContext.current)
                         .data(data = Uri.parse(imageUri))
+                        .error(R.drawable.app_logo)
+                        .placeholder(R.drawable.app_logo)
                         .build()
                 ),
                 contentDescription = "Miniatura",
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Fit
             )
 
             // Indicador de que la foto tiene dibujos

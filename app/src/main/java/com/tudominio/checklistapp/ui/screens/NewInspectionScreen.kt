@@ -123,6 +123,7 @@ fun NewInspectionScreen(
                 }
                 InspectionStage.COMPLETED -> {
                     CompletedScreen(
+                        viewModel = viewModel,
                         onBackToHome = onInspectionCompleted
                     )
                 }
