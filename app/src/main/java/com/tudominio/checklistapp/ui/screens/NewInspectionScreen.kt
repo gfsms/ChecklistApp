@@ -2,15 +2,20 @@ package com.tudominio.checklistapp.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -22,8 +27,15 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tudominio.checklistapp.ui.components.LabeledTextField
@@ -138,9 +150,29 @@ fun NewInspectionScreen(
  */
 @Composable
 fun InitialInfoForm(viewModel: NewInspectionViewModel) {
-    // Agregamos un efecto para debug
-    LaunchedEffect(key1 = true) {
-        println("InitialInfoForm composición")
+    var equipmentValue by remember { mutableStateOf(viewModel.inspection.equipment) }
+    var isCustomEquipment by remember { mutableStateOf(false) }
+
+    // Validate CAEX ID format
+    fun validateEquipment(value: String): Boolean {
+        if (value.isBlank()) return false
+
+        val caexPattern = "^CAEX (\\d{3})$".toRegex()
+        val match = caexPattern.find(value)
+
+        if (match != null) {
+            val caexNumber = match.groupValues[1].toInt()
+            return (caexNumber in 301..339) || caexNumber == 365 || caexNumber == 366
+        }
+
+        return false
+    }
+
+    // Verify and update equipment
+    fun updateEquipmentValue(value: String) {
+        equipmentValue = value
+        isCustomEquipment = !validateEquipment(value)
+        viewModel.updateEquipment(value)
     }
 
     Column(
@@ -157,15 +189,56 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             color = MaterialTheme.colorScheme.primary
         )
 
+        // Helper card with instructions
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Indicaciones",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Complete los datos del equipo que está inspeccionando. El formato del equipo debe ser 'CAEX XXX' donde XXX es el número de identificación (301-339, 365 o 366).",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Campo para el equipo
+        // Campo para el equipo (con formato CAEX XXX)
         LabeledTextField(
-            value = viewModel.inspection.equipment,
-            onValueChange = { viewModel.updateEquipment(it) },
-            label = "Equipo (CAEX)",
-            isError = viewModel.equipmentError,
-            errorMessage = "El equipo es obligatorio"
+            value = equipmentValue,
+            onValueChange = { updateEquipmentValue(it) },
+            label = "Equipo (Formato: CAEX XXX)",
+            isError = viewModel.equipmentError || isCustomEquipment,
+            errorMessage = when {
+                viewModel.equipmentError -> "El equipo es obligatorio"
+                isCustomEquipment -> "Formato inválido o ID de CAEX no permitido (use 301-339, 365 o 366)"
+                else -> ""
+            },
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            )
         )
 
         // Campo para el inspector
@@ -174,7 +247,12 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             onValueChange = { viewModel.updateInspector(it) },
             label = "Inspector",
             isError = viewModel.inspectorError,
-            errorMessage = "El inspector es obligatorio"
+            errorMessage = "El inspector es obligatorio",
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            )
         )
 
         // Campo para el supervisor
@@ -183,7 +261,12 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             onValueChange = { viewModel.updateSupervisor(it) },
             label = "Supervisor de Taller",
             isError = viewModel.supervisorError,
-            errorMessage = "El supervisor es obligatorio"
+            errorMessage = "El supervisor es obligatorio",
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Text,
+                imeAction = ImeAction.Next
+            )
         )
 
         // Campo para el horómetro
@@ -201,7 +284,10 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
         // Botón para continuar
         PrimaryButton(
             text = "Continuar",
-            onClick = { viewModel.proceedToNextStage() }
+            onClick = { viewModel.proceedToNextStage() },
+            enabled = !viewModel.equipmentError && !viewModel.inspectorError &&
+                    !viewModel.supervisorError && !viewModel.horometerError &&
+                    !isCustomEquipment
         )
     }
 }

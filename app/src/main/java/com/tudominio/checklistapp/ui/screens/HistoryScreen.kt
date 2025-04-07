@@ -14,90 +14,67 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tudominio.checklistapp.data.model.Inspection
 import com.tudominio.checklistapp.ui.theme.Green
 import com.tudominio.checklistapp.ui.theme.Red
 import com.tudominio.checklistapp.ui.theme.Yellow
-import java.time.LocalDateTime
+import com.tudominio.checklistapp.ui.viewmodels.HistoryViewModel
+import kotlinx.coroutines.flow.collectLatest
 import java.time.format.DateTimeFormatter
-
-// Mock data class similar to your InspectionEntity
-data class MockInspection(
-    val id: String,
-    val equipment: String,
-    val inspector: String,
-    val date: LocalDateTime,
-    val conformityPercentage: Float
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     onNavigateBack: () -> Unit,
-    onNavigateToDashboard: () -> Unit = {}
+    onNavigateToDashboard: () -> Unit = {},
+    viewModel: HistoryViewModel = viewModel()
 ) {
-    // State for search and filters
-    var searchQuery by remember { mutableStateOf("") }
+    // Collect inspections from StateFlow
+    val inspections by viewModel.inspections.collectAsState(initial = emptyList())
+
+    // Local state for UI elements
     var showFilters by remember { mutableStateOf(false) }
-    var selectedFilterOption by remember { mutableStateOf("Todos") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var inspectionToDelete by remember { mutableStateOf<String?>(null) }
+
     val filterOptions = listOf("Todos", "Alta Conformidad", "Media Conformidad", "Baja Conformidad")
 
-    // Create mock data
-    val allMockInspections = remember {
-        listOf(
-            MockInspection(
-                id = "1",
-                equipment = "CAEX 301",
-                inspector = "Juan Pérez",
-                date = LocalDateTime.now().minusDays(1),
-                conformityPercentage = 95f
-            ),
-            MockInspection(
-                id = "2",
-                equipment = "CAEX 302",
-                inspector = "María González",
-                date = LocalDateTime.now().minusDays(3),
-                conformityPercentage = 82f
-            ),
-            MockInspection(
-                id = "3",
-                equipment = "CAEX 303",
-                inspector = "Pedro Rodríguez",
-                date = LocalDateTime.now().minusDays(5),
-                conformityPercentage = 65f
-            ),
-            MockInspection(
-                id = "4",
-                equipment = "CAEX 304",
-                inspector = "Ana López",
-                date = LocalDateTime.now().minusDays(7),
-                conformityPercentage = 45f
-            ),
-            MockInspection(
-                id = "5",
-                equipment = "CAEX 305",
-                inspector = "Carlos Martínez",
-                date = LocalDateTime.now().minusDays(9),
-                conformityPercentage = 92f
-            )
-        )
+    // Error handling
+    LaunchedEffect(viewModel.errorMessage) {
+        // Error handling can be added here if needed
     }
 
-    // Apply search and filters
-    val filteredInspections = allMockInspections.filter { inspection ->
-        // Apply search query
-        val matchesSearch = searchQuery.isEmpty() ||
-                inspection.equipment.contains(searchQuery, ignoreCase = true) ||
-                inspection.inspector.contains(searchQuery, ignoreCase = true)
-
-        // Apply conformity filter
-        val matchesFilter = when (selectedFilterOption) {
-            "Alta Conformidad" -> inspection.conformityPercentage >= 90f
-            "Media Conformidad" -> inspection.conformityPercentage >= 70f && inspection.conformityPercentage < 90f
-            "Baja Conformidad" -> inspection.conformityPercentage < 70f
-            else -> true // "Todos"
-        }
-
-        matchesSearch && matchesFilter
+    // Delete confirmation dialog
+    if (showDeleteDialog && inspectionToDelete != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteDialog = false
+                inspectionToDelete = null
+            },
+            title = { Text("Confirmar eliminación") },
+            text = { Text("¿Está seguro que desea eliminar esta inspección? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        inspectionToDelete?.let { viewModel.deleteInspection(it) }
+                        showDeleteDialog = false
+                        inspectionToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Red)
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    inspectionToDelete = null
+                }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -143,8 +120,8 @@ fun HistoryScreen(
         ) {
             // Search bar
             OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
+                value = viewModel.searchQuery,
+                onValueChange = { viewModel.updateSearchQuery(it) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
@@ -156,8 +133,8 @@ fun HistoryScreen(
                     )
                 },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                    if (viewModel.searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { viewModel.updateSearchQuery("") }) {
                             Icon(
                                 Icons.Default.Clear,
                                 contentDescription = "Limpiar"
@@ -193,71 +170,87 @@ fun HistoryScreen(
 
                         FilterChipGroup(
                             options = filterOptions,
-                            selectedOption = selectedFilterOption,
-                            onOptionSelected = { selectedFilterOption = it }
+                            selectedOption = viewModel.selectedFilter,
+                            onOptionSelected = { viewModel.updateFilter(it) }
                         )
                     }
                 }
             }
 
-            // Info message
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer
-                )
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = "Datos de ejemplo. El acceso al historial completo estará disponible en futuras versiones.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-
             // Results count
             Text(
-                text = "${filteredInspections.size} inspecciones encontradas",
+                text = "${inspections.size} inspecciones encontradas",
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            // Inspections list
-            if (filteredInspections.isEmpty()) {
+            // Loading indicator
+            if (viewModel.isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = "No se encontraron inspecciones",
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center
-                    )
+                    CircularProgressIndicator()
                 }
-            } else {
+            }
+            // Empty state
+            else if (inspections.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(64.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Text(
+                            text = "No hay inspecciones",
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = if (viewModel.searchQuery.isNotEmpty() || viewModel.selectedFilter != "Todos")
+                                "Prueba a ajustar los filtros o la búsqueda"
+                            else
+                                "Cree una nueva inspección para comenzar",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+            // Inspections list
+            else {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredInspections) { inspection ->
-                        InspectionCard(inspection = inspection)
+                    items(inspections) { inspection ->
+                        InspectionCard(
+                            inspection = inspection,
+                            onDeleteInspection = {
+                                inspectionToDelete = inspection.id
+                                showDeleteDialog = true
+                            }
+                        )
                     }
                 }
             }
@@ -278,31 +271,62 @@ fun FilterChipGroup(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         options.forEach { option ->
-            FilterChip(
-                selected = selectedOption == option,
+            // Using a safe version of FilterChip that won't cause experimental API warnings
+            Surface(
+                modifier = Modifier.weight(1f),
                 onClick = { onOptionSelected(option) },
-                label = { Text(option) },
-                colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                color = if (selectedOption == option)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surface,
+                contentColor = if (selectedOption == option)
+                    MaterialTheme.colorScheme.onPrimary
+                else
+                    MaterialTheme.colorScheme.onSurface,
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = option,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
-            )
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun InspectionCard(inspection: MockInspection) {
+fun InspectionCard(
+    inspection: Inspection,
+    onDeleteInspection: () -> Unit
+) {
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     val formattedDate = inspection.date.format(dateFormatter)
+
+    // Calculate conformity percentage
+    val totalQuestions = inspection.items.sumOf { it.questions.size }
+    val answeredQuestions = inspection.items.sumOf { item ->
+        item.questions.count { it.answer != null }
+    }
+    val conformQuestions = inspection.items.sumOf { item ->
+        item.questions.count { question ->
+            question.answer?.isConform == true
+        }
+    }
+
+    val conformityPercentage = if (answeredQuestions > 0) {
+        (conformQuestions.toFloat() / answeredQuestions) * 100
+    } else {
+        0f
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = { /* No action for now */ }
+        onClick = { /* Future: Navigate to inspection details */ }
     ) {
         Column(
             modifier = Modifier
@@ -315,16 +339,32 @@ fun InspectionCard(inspection: MockInspection) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Equipo: ${inspection.equipment}",
+                    text = inspection.equipment,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
 
-                Icon(
-                    imageVector = Icons.Default.Event,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
-                )
+                Row {
+                    IconButton(
+                        onClick = onDeleteInspection,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Eliminar",
+                            tint = Red.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Icon(
+                        imageVector = Icons.Default.Event,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -343,13 +383,13 @@ fun InspectionCard(inspection: MockInspection) {
 
             // Conformity indicator
             val conformityColor = when {
-                inspection.conformityPercentage >= 90f -> Green
-                inspection.conformityPercentage >= 70f -> Yellow
+                conformityPercentage >= 90f -> Green
+                conformityPercentage >= 70f -> Yellow
                 else -> Red
             }
 
             Text(
-                text = "Conformidad: ${inspection.conformityPercentage.toInt()}%",
+                text = "Conformidad: ${conformityPercentage.toInt()}%",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -357,7 +397,7 @@ fun InspectionCard(inspection: MockInspection) {
             Spacer(modifier = Modifier.height(4.dp))
 
             LinearProgressIndicator(
-                progress = inspection.conformityPercentage / 100f,
+                progress = conformityPercentage / 100f,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(8.dp),

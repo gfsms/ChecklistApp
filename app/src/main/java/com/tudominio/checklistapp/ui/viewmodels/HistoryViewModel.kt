@@ -7,94 +7,238 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.tudominio.checklistapp.data.database.AppDatabase
-import com.tudominio.checklistapp.data.database.InspectionEntity
+import com.tudominio.checklistapp.ChecklistApplication
 import com.tudominio.checklistapp.data.model.Inspection
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * ViewModel for the history screen that interacts with the repository
+ * to load and display inspection history.
+ */
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
+    private val TAG = "HistoryViewModel"
 
-    private val db = AppDatabase.getDatabase(application)
+    // Repository instance from the Application class
+    private val repository = (application as ChecklistApplication).repository
 
-    // Using composition mutableStateOf instead of LiveData
-    var isLoading by mutableStateOf(true)
-        private set
+    // Using StateFlow for list of inspections to observe changes
+    private val _inspections = MutableStateFlow<List<Inspection>>(emptyList())
+    val inspections: StateFlow<List<Inspection>> = _inspections.asStateFlow()
 
-    var inspections by mutableStateOf<List<InspectionEntity>>(emptyList())
-        private set
-
+    // State for the selected inspection
     var selectedInspection by mutableStateOf<Inspection?>(null)
         private set
 
+    // Loading state
+    var isLoading by mutableStateOf(true)
+        private set
+
+    // Error state
     var errorMessage by mutableStateOf<String?>(null)
+        private set
+
+    // Search and filter states
+    var searchQuery by mutableStateOf("")
+        private set
+
+    var selectedFilter by mutableStateOf("Todos")
         private set
 
     init {
         loadInspections()
     }
 
+    /**
+     * Load all inspections from the repository
+     */
     fun loadInspections() {
         viewModelScope.launch {
-            try {
-                isLoading = true
-                errorMessage = null
+            isLoading = true
+            errorMessage = null
 
-                withContext(Dispatchers.IO) {
-                    val inspectionsList = db.inspectionDao().getAllInspectionsList()
-                    withContext(Dispatchers.Main) {
-                        inspections = inspectionsList
-                    }
+            try {
+                // Collect inspections from Flow
+                repository.allInspections.collectLatest { inspectionList ->
+                    val filteredList = filterInspections(inspectionList, searchQuery, selectedFilter)
+                    _inspections.value = filteredList
+                    isLoading = false
                 }
             } catch (e: Exception) {
-                Log.e("HistoryViewModel", "Error loading inspections", e)
-                errorMessage = "Error loading inspections: ${e.message}"
-            } finally {
+                Log.e(TAG, "Error loading inspections: ${e.message}", e)
+                errorMessage = "Error al cargar las inspecciones: ${e.message}"
                 isLoading = false
             }
         }
     }
 
-    fun loadInspectionDetails(inspectionId: String) {
+    /**
+     * Update search query and filter inspections
+     */
+    fun updateSearchQuery(query: String) {
+        searchQuery = query
+        filterCurrentInspections()
+    }
+
+    /**
+     * Update filter option and filter inspections
+     */
+    fun updateFilter(filter: String) {
+        selectedFilter = filter
+        filterCurrentInspections()
+    }
+
+    /**
+     * Filter inspections based on current search query and filter option
+     */
+    private fun filterCurrentInspections() {
         viewModelScope.launch {
             try {
-                isLoading = true
-                errorMessage = null
-
-                withContext(Dispatchers.IO) {
-                    val inspection = db.inspectionDao().getInspectionById(inspectionId)
-                    val items = db.inspectionDao().getItemsForInspection(inspectionId)
-
-                    // Build a simplified inspection object with minimal data
-                    val inspectionWithItems = Inspection(
-                        id = inspection.id,
-                        equipment = inspection.equipment,
-                        inspector = inspection.inspector,
-                        supervisor = inspection.supervisor,
-                        horometer = inspection.horometer,
-                        date = inspection.date,
-                        isCompleted = inspection.isCompleted,
-                        items = emptyList() // We'll just show basic info for now
-                    )
-
-                    withContext(Dispatchers.Main) {
-                        selectedInspection = inspectionWithItems
-                    }
+                val allInspections = withContext(Dispatchers.IO) {
+                    repository.getAllInspectionsList()
                 }
+                val filteredList = filterInspections(allInspections, searchQuery, selectedFilter)
+                _inspections.value = filteredList
             } catch (e: Exception) {
-                Log.e("HistoryViewModel", "Error loading inspection details", e)
-                errorMessage = "Error loading details: ${e.message}"
-            } finally {
+                Log.e(TAG, "Error filtering inspections: ${e.message}", e)
+                errorMessage = "Error al filtrar las inspecciones: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * Helper function to filter inspections
+     */
+    private fun filterInspections(
+        inspections: List<Inspection>,
+        query: String,
+        filter: String
+    ): List<Inspection> {
+        // First apply search query
+        var filteredList = if (query.isNotEmpty()) {
+            inspections.filter {
+                it.equipment.contains(query, ignoreCase = true) ||
+                        it.inspector.contains(query, ignoreCase = true)
+            }
+        } else {
+            inspections
+        }
+
+        // Then apply conformity filter
+        filteredList = when (filter) {
+            "Alta Conformidad" -> {
+                // Calculate conformity percentage for each inspection
+                filteredList.filter { inspection ->
+                    calculateConformityPercentage(inspection) >= 90f
+                }
+            }
+            "Media Conformidad" -> {
+                filteredList.filter { inspection ->
+                    val conformity = calculateConformityPercentage(inspection)
+                    conformity >= 70f && conformity < 90f
+                }
+            }
+            "Baja Conformidad" -> {
+                filteredList.filter { inspection ->
+                    calculateConformityPercentage(inspection) < 70f
+                }
+            }
+            else -> filteredList // "Todos"
+        }
+
+        return filteredList
+    }
+
+    /**
+     * Calculate conformity percentage for an inspection
+     */
+    private fun calculateConformityPercentage(inspection: Inspection): Float {
+        val totalQuestions = inspection.items.sumOf { it.questions.size }
+        val answeredQuestions = inspection.items.sumOf { item ->
+            item.questions.count { it.answer != null }
+        }
+        val conformQuestions = inspection.items.sumOf { item ->
+            item.questions.count { question ->
+                question.answer?.isConform == true
+            }
+        }
+
+        return if (answeredQuestions > 0) {
+            (conformQuestions.toFloat() / answeredQuestions) * 100
+        } else {
+            0f
+        }
+    }
+
+    /**
+     * Load the full details of a specific inspection
+     */
+    fun loadInspectionDetails(inspectionId: String) {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+
+            try {
+                val inspection = withContext(Dispatchers.IO) {
+                    repository.getFullInspection(inspectionId)
+                }
+
+                selectedInspection = inspection
+                isLoading = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Error loading inspection details: ${e.message}", e)
+                errorMessage = "Error al cargar los detalles de la inspección: ${e.message}"
                 isLoading = false
             }
         }
     }
 
+    /**
+     * Delete an inspection
+     */
+    fun deleteInspection(inspectionId: String) {
+        viewModelScope.launch {
+            isLoading = true
+
+            try {
+                val success = withContext(Dispatchers.IO) {
+                    repository.deleteInspection(inspectionId)
+                }
+
+                if (success) {
+                    // Refresh the list
+                    if (selectedInspection?.id == inspectionId) {
+                        selectedInspection = null
+                    }
+
+                    filterCurrentInspections()
+                } else {
+                    errorMessage = "No se pudo eliminar la inspección"
+                }
+                isLoading = false
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deleting inspection: ${e.message}", e)
+                errorMessage = "Error al eliminar la inspección: ${e.message}"
+                isLoading = false
+            }
+        }
+    }
+
+    /**
+     * Clear the selected inspection
+     */
     fun clearSelectedInspection() {
         selectedInspection = null
     }
 
+    /**
+     * Clear any error message
+     */
     fun clearError() {
         errorMessage = null
     }

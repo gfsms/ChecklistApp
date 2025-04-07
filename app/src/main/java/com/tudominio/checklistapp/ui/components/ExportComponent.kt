@@ -215,7 +215,7 @@ private suspend fun exportToCsv(
                         item.questions.forEach { question ->
                             val conformity = when {
                                 question.answer == null -> "Sin responder"
-                                question.answer.isConform -> "Conforme"
+                                question.answer!!.isConform -> "Conforme"
                                 else -> "No Conforme"
                             }
 

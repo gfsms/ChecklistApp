@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardCapitalization
 
 /**
  * Campo de texto personalizado para los formularios de la aplicación.
@@ -38,7 +39,8 @@ fun LabeledTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     imeAction: ImeAction = ImeAction.Next,
     onImeAction: () -> Unit = {},
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    keyboardOptions: KeyboardOptions
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         OutlinedTextField(
@@ -107,6 +109,11 @@ fun NumericTextField(
         keyboardType = KeyboardType.Number,
         imeAction = imeAction,
         onImeAction = onImeAction,
-        modifier = modifier
+        modifier = modifier,
+        keyboardOptions = KeyboardOptions(
+            capitalization = KeyboardCapitalization.Characters,
+            keyboardType = KeyboardType.Text,
+            imeAction = ImeAction.Next
+        )
     )
 }

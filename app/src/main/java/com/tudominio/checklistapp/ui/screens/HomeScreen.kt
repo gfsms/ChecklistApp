@@ -45,7 +45,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Checklist de Inspección") },
+                title = { Text("Checklist de Inspección CAEX") },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     titleContentColor = MaterialTheme.colorScheme.onPrimary
@@ -77,7 +77,7 @@ fun HomeScreen(
                 )
 
                 Text(
-                    text = "Sistema de Gestión de Inspecciones",
+                    text = "Sistema de Gestión de Inspecciones CAEX",
                     style = MaterialTheme.typography.titleLarge,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.primary
@@ -98,7 +98,7 @@ fun HomeScreen(
                     // Botón de Nueva Inspección
                     MenuCardButton(
                         title = "Nueva Inspección",
-                        description = "Iniciar una nueva inspección de equipo. Complete el formulario y registre conformidades y no conformidades.",
+                        description = "Iniciar una nueva inspección de CAEX. Complete el formulario y registre conformidades y no conformidades en los 8 ítems de revisión.",
                         onClick = {
                             viewModel.resetInspection()
                             onNavigateToNewInspection()
@@ -108,16 +108,65 @@ fun HomeScreen(
                     // Botón de Revisar Historial
                     MenuCardButton(
                         title = "Revisar Historial",
-                        description = "Consulte inspecciones anteriores, visualice estadísticas y genere reportes de inspecciones pasadas.",
+                        description = "Consulte inspecciones anteriores, visualice estadísticas y genere reportes de inspecciones pasadas de los CAEX.",
                         onClick = onNavigateToHistory
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Pie de página o información adicional
+                // Instrucciones de uso
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Instrucciones de Uso",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "1. Para iniciar una nueva inspección, seleccione 'Nueva Inspección'.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Text(
+                            text = "2. Complete la información básica del CAEX (equipo, inspector, supervisor, horómetro).",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Text(
+                            text = "3. Complete cada ítem del checklist, marcando como 'Conforme' o 'No Conforme' cada punto.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Text(
+                            text = "4. Para los puntos 'No Conformes', agregue comentarios y fotos como evidencia.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+
+                        Text(
+                            text = "5. Al finalizar, revise el resumen y genere el informe de inspección en PDF.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+
+                // Pie de página
                 Text(
-                    text = "Versión 100.0 estoy cansado csm",
+                    text = "Versión 1.0.0",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 24.dp)

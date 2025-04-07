@@ -157,29 +157,13 @@ fun PieChart(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val total = data.slices.sumOf { it.value.toDouble() }.toFloat()
-                    val radius = size.minDimension / 3
-                    val center = Offset(size.width / 2, size.height / 2)
+                // Create pie chart
+                SimplePieChart(
+                    data = data,
+                    modifier = Modifier.fillMaxSize()
+                )
 
-                    var startAngle = -90f // Start from the top
-
-                    data.slices.forEach { slice ->
-                        val sweepAngle = 360f * (slice.value / total)
-
-                        drawArc(
-                            color = slice.color,
-                            startAngle = startAngle,
-                            sweepAngle = sweepAngle,
-                            useCenter = true,
-                            topLeft = Offset(center.x - radius, center.y - radius),
-                            size = Size(radius * 2, radius * 2)
-                        )
-
-                        startAngle += sweepAngle
-                    }
-                }
-
+                // Legend
                 Column(
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
@@ -212,11 +196,43 @@ fun PieChart(
 }
 
 @Composable
+private fun SimplePieChart(
+    data: PieChartData,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val total = data.slices.sumOf { it.value.toDouble() }.toFloat()
+        val radius = size.minDimension / 3
+        val center = Offset(size.width / 2, size.height / 2)
+
+        var startAngle = -90f // Start from the top
+
+        data.slices.forEach { slice ->
+            val sweepAngle = 360f * (slice.value / total)
+
+            drawArc(
+                color = slice.color,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = true,
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2, radius * 2)
+            )
+
+            startAngle += sweepAngle
+        }
+    }
+}
+
+@Composable
 fun BarChart(
     data: BarChartData,
     title: String,
     modifier: Modifier = Modifier
 ) {
+    // Get the outline color before entering Canvas
+    val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+
     Card(
         modifier = modifier
     ) {
@@ -238,48 +254,25 @@ fun BarChart(
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val maxValue = 100f // Using percentage scale
-                    val barWidth = size.width / (data.bars.size * 2)
-                    val barSpacing = barWidth / 2
+                // Create the bar chart
+                SimpleBarChart(
+                    data = data,
+                    axisColor = outlineColor,
+                    modifier = Modifier.fillMaxSize()
+                )
 
-                    // Draw axes
-                    drawLine(
-                        color = MaterialTheme.colorScheme.outline,
-                        start = Offset(barSpacing, 0f),
-                        end = Offset(barSpacing, size.height - 20.dp.toPx())
-                    )
+                // Add labels separately
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    // Empty space for the chart
+                    Spacer(modifier = Modifier.weight(1f))
 
-                    drawLine(
-                        color = MaterialTheme.colorScheme.outline,
-                        start = Offset(barSpacing, size.height - 20.dp.toPx()),
-                        end = Offset(size.width, size.height - 20.dp.toPx())
-                    )
-
-                    // Draw bars
-                    data.bars.forEachIndexed { index, bar ->
-                        val barHeight = (bar.value / maxValue) * (size.height - 30.dp.toPx())
-                        val startX = barSpacing + (index * (barWidth + barSpacing))
-                        val startY = size.height - 20.dp.toPx() - barHeight
-
-                        drawRect(
-                            color = bar.color,
-                            topLeft = Offset(startX, startY),
-                            size = Size(barWidth, barHeight)
-                        )
-
-                        // Labels drawn in simpler way without nativeCanvas
-                        // which was causing compatibility issues
-                    }
-                }
-
-                // Draw labels as composable elements instead
-                Box(modifier = Modifier.fillMaxSize()) {
+                    // Bottom labels
                     Row(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .padding(bottom = 4.dp),
+                            .padding(top = 24.dp),  // Provide space for x-axis
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         data.bars.forEach { bar ->
@@ -293,32 +286,79 @@ fun BarChart(
                     }
                 }
 
-                // Draw values as composable elements
-                Box(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 30.dp),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.Bottom
-                    ) {
-                        data.bars.forEach { bar ->
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
+                // Add value labels
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceAround
+                ) {
+                    data.bars.forEach { bar ->
+                        // Calculate position to align with bars
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.TopCenter
+                        ) {
+                            // Dynamic positioning based on bar height
+                            val barHeightFraction = bar.value / 100f
+                            val baseHeight = 0.8f // Base height for the chart area
+                            val verticalPosition = baseHeight - (barHeightFraction * baseHeight)
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight(verticalPosition)
+                                    .fillMaxWidth(),
+                                contentAlignment = Alignment.BottomCenter
                             ) {
                                 Text(
                                     text = "${bar.value.toInt()}%",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = bar.color
                                 )
-
-                                Spacer(modifier = Modifier.weight(1f))
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SimpleBarChart(
+    data: BarChartData,
+    axisColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val maxValue = 100f
+        val barWidth = size.width / (data.bars.size * 2)
+        val barSpacing = barWidth / 2
+        val chartHeight = size.height - 30.dp.toPx()
+        val bottomY = chartHeight
+
+        // Draw axes
+        drawLine(
+            color = axisColor,
+            start = Offset(barSpacing, 0f),
+            end = Offset(barSpacing, bottomY)
+        )
+
+        drawLine(
+            color = axisColor,
+            start = Offset(barSpacing, bottomY),
+            end = Offset(size.width, bottomY)
+        )
+
+        // Draw bars
+        data.bars.forEachIndexed { index, bar ->
+            val barHeight = (bar.value / maxValue) * chartHeight
+            val startX = barSpacing + (index * (barWidth + barSpacing))
+            val startY = bottomY - barHeight
+
+            drawRect(
+                color = bar.color,
+                topLeft = Offset(startX, startY),
+                size = Size(barWidth, barHeight)
+            )
         }
     }
 }
