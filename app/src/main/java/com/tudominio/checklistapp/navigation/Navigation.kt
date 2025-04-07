@@ -1,21 +1,13 @@
 package com.tudominio.checklistapp.navigation
 
-import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.tudominio.checklistapp.ui.screens.CameraScreen
-import com.tudominio.checklistapp.ui.screens.DrawingScreen
-import com.tudominio.checklistapp.ui.screens.HistoryScreen
-import com.tudominio.checklistapp.ui.screens.HomeScreen
-import com.tudominio.checklistapp.ui.screens.NewInspectionScreen
-import com.tudominio.checklistapp.ui.screens.PhotoScreen
-import com.tudominio.checklistapp.ui.screens.SplashScreen
+import com.tudominio.checklistapp.ui.screens.*
 import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
@@ -23,13 +15,13 @@ import java.nio.charset.StandardCharsets
 
 /**
  * Definición de las rutas de navegación de la aplicación.
- * Cada pantalla tiene una ruta única que se utiliza para la navegación.
  */
 sealed class Screen(val route: String) {
     object Splash : Screen("splash_screen")
     object Home : Screen("home_screen")
     object NewInspection : Screen("new_inspection_screen")
     object History : Screen("history_screen")
+    object Dashboard : Screen("dashboard_screen")
     object Camera : Screen("camera_screen/{questionId}") {
         fun createRoute(questionId: String) = "camera_screen/$questionId"
     }
@@ -45,14 +37,13 @@ sealed class Screen(val route: String) {
 }
 
 /**
- * Configura el grafo de navegación de la aplicación con todas las rutas disponibles.
- * Define cómo se conectan las diferentes pantallas entre sí.
+ * Configura el grafo de navegación de la aplicación.
  */
 @Composable
 fun SetupNavGraph(
     navController: NavHostController
 ) {
-    // Crear un ViewModel compartido para todas las pantallas
+    // ViewModel compartido para todas las pantallas
     val viewModel: NewInspectionViewModel = viewModel()
 
     NavHost(
@@ -62,9 +53,7 @@ fun SetupNavGraph(
         // Pantalla de Splash
         composable(route = Screen.Splash.route) {
             SplashScreen(onSplashFinished = {
-                // Navegar a la pantalla principal cuando termine el splash
                 navController.navigate(Screen.Home.route) {
-                    // Elimina la pantalla splash del stack de navegación
                     popUpTo(Screen.Splash.route) { inclusive = true }
                 }
             })
@@ -73,11 +62,9 @@ fun SetupNavGraph(
         // Pantalla Principal (Home)
         composable(route = Screen.Home.route) {
             HomeScreen(
-                // Navegación a Nueva Inspección
                 onNavigateToNewInspection = {
                     navController.navigate(Screen.NewInspection.route)
                 },
-                // Navegación a Historial
                 onNavigateToHistory = {
                     navController.navigate(Screen.History.route)
                 },
@@ -100,10 +87,21 @@ fun SetupNavGraph(
             )
         }
 
-        // Pantalla de Historial (por implementar)
+        // Pantalla de Historial
         composable(route = Screen.History.route) {
             HistoryScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onNavigateToDashboard = {
+                    navController.navigate(Screen.Dashboard.route)
+                }
+            )
+        }
+
+        // Dashboard
+        composable(route = Screen.Dashboard.route) {
+            DashboardScreen(
+                onNavigateBack = { navController.navigateUp() },
+                inspection = viewModel.inspection.takeIf { it.isCompleted }
             )
         }
 
@@ -116,7 +114,6 @@ fun SetupNavGraph(
 
             CameraScreen(
                 onPhotoTaken = { uri ->
-                    // Al tomar la foto, actualizamos el viewModel y volvemos a la pantalla anterior
                     viewModel.addPhotoToQuestion(questionId, uri.toString())
                     navController.popBackStack()
                 },
@@ -138,14 +135,12 @@ fun SetupNavGraph(
                 PhotoScreen(
                     photos = q.answer?.photos ?: emptyList(),
                     onAddPhoto = {
-                        // Navegamos a la pantalla de cámara
                         navController.navigate(Screen.Camera.createRoute(questionId))
                     },
                     onDeletePhoto = { photo ->
                         viewModel.removePhotoFromQuestion(questionId, photo)
                     },
                     onEditPhoto = { photo ->
-                        // Navegamos a la pantalla de dibujo
                         navController.navigate(
                             Screen.Drawing.createRoute(
                                 photoUri = photo.uri,
@@ -181,7 +176,6 @@ fun SetupNavGraph(
             DrawingScreen(
                 photoUri = photoUri,
                 onDrawingFinished = { drawingUri ->
-                    // Al terminar el dibujo, actualizamos la foto en el viewModel
                     viewModel.updatePhotoWithDrawing(questionId, photoId, drawingUri)
                     navController.popBackStack()
                 },

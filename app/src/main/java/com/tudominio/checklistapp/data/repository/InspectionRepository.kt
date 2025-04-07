@@ -1,4 +1,3 @@
-// app/src/main/java/com/tudominio/checklistapp/data/repository/InspectionRepository.kt
 package com.tudominio.checklistapp.data.repository
 
 import com.tudominio.checklistapp.data.database.*
@@ -9,10 +8,12 @@ import java.time.LocalDateTime
 
 class InspectionRepository(private val inspectionDao: InspectionDao) {
 
+    // Expose all inspections as a Flow
     val allInspections: Flow<List<InspectionEntity>> = inspectionDao.getAllInspections()
 
+    // Save a complete inspection to the database
     suspend fun saveInspection(inspection: Inspection) {
-        // Calcular el porcentaje de conformidad
+        // Calculate conformity percentage
         val totalQuestions = inspection.items.sumOf { it.questions.size }
         val answeredQuestions = inspection.items.sumOf { item ->
             item.questions.count { it.answer != null }
@@ -29,7 +30,7 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
             0f
         }
 
-        // Guardar la inspección principal
+        // Save main inspection entity
         val inspectionEntity = InspectionEntity(
             id = inspection.id,
             equipment = inspection.equipment,
@@ -42,7 +43,7 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
         )
         inspectionDao.insertInspection(inspectionEntity)
 
-        // Guardar los ítems
+        // Save items, questions and photos
         inspection.items.forEach { item ->
             val itemEntity = InspectionItemEntity(
                 id = item.id,
@@ -51,7 +52,6 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
             )
             inspectionDao.insertItem(itemEntity)
 
-            // Guardar las preguntas
             item.questions.forEach { question ->
                 val questionEntity = InspectionQuestionEntity(
                     id = question.id,
@@ -62,7 +62,6 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
                 )
                 inspectionDao.insertQuestion(questionEntity)
 
-                // Guardar las fotos
                 question.answer?.photos?.forEach { photo ->
                     val photoEntity = PhotoEntity(
                         id = photo.id,
@@ -78,10 +77,13 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
         }
     }
 
+    // Get a complete inspection with all its data
     suspend fun getFullInspection(inspectionId: String): Inspection {
+        // Get base inspection data
         val inspectionEntity = inspectionDao.getInspectionById(inspectionId)
         val itemEntities = inspectionDao.getItemsForInspection(inspectionId)
 
+        // Build the complete inspection object
         val items = itemEntities.map { itemEntity ->
             val questionEntities = inspectionDao.getQuestionsForItem(itemEntity.id)
 
@@ -103,7 +105,7 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
                         isConform = questionEntity.isConform,
                         comment = questionEntity.comment ?: "",
                         photos = photos,
-                        timestamp = LocalDateTime.now()
+                        timestamp = LocalDateTime.now() // Using current time as we don't store answer timestamp
                     )
                 } else null
 
@@ -133,6 +135,7 @@ class InspectionRepository(private val inspectionDao: InspectionDao) {
         )
     }
 
+    // Find recurring non-conformities for warning
     suspend fun findRecurringNonConformities(
         questionText: String,
         itemName: String,

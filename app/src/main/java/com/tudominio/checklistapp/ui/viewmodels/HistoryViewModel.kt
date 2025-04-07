@@ -1,55 +1,101 @@
-// app/src/main/java/com/tudominio/checklistapp/ui/viewmodels/HistoryViewModel.kt
 package com.tudominio.checklistapp.ui.viewmodels
 
 import android.app.Application
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.tudominio.checklistapp.data.database.AppDatabase
 import com.tudominio.checklistapp.data.database.InspectionEntity
 import com.tudominio.checklistapp.data.model.Inspection
-import com.tudominio.checklistapp.data.repository.InspectionRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: InspectionRepository
-    private val _inspections = MutableStateFlow<List<InspectionEntity>>(emptyList())
-    val inspections: StateFlow<List<InspectionEntity>> = _inspections
 
-    private val _selectedInspection = MutableStateFlow<Inspection?>(null)
-    val selectedInspection: StateFlow<Inspection?> = _selectedInspection
+    private val db = AppDatabase.getDatabase(application)
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
+    // Using composition mutableStateOf instead of LiveData
+    var isLoading by mutableStateOf(true)
+        private set
+
+    var inspections by mutableStateOf<List<InspectionEntity>>(emptyList())
+        private set
+
+    var selectedInspection by mutableStateOf<Inspection?>(null)
+        private set
+
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
 
     init {
-        val inspectionDao = AppDatabase.getDatabase(application).inspectionDao()
-        repository = InspectionRepository(inspectionDao)
+        loadInspections()
+    }
 
+    fun loadInspections() {
         viewModelScope.launch {
-            repository.allInspections.collectLatest {
-                _inspections.value = it
+            try {
+                isLoading = true
+                errorMessage = null
+
+                withContext(Dispatchers.IO) {
+                    val inspectionsList = db.inspectionDao().getAllInspectionsList()
+                    withContext(Dispatchers.Main) {
+                        inspections = inspectionsList
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("HistoryViewModel", "Error loading inspections", e)
+                errorMessage = "Error loading inspections: ${e.message}"
+            } finally {
+                isLoading = false
             }
         }
     }
 
     fun loadInspectionDetails(inspectionId: String) {
         viewModelScope.launch {
-            _isLoading.value = true
             try {
-                val inspection = repository.getFullInspection(inspectionId)
-                _selectedInspection.value = inspection
+                isLoading = true
+                errorMessage = null
+
+                withContext(Dispatchers.IO) {
+                    val inspection = db.inspectionDao().getInspectionById(inspectionId)
+                    val items = db.inspectionDao().getItemsForInspection(inspectionId)
+
+                    // Build a simplified inspection object with minimal data
+                    val inspectionWithItems = Inspection(
+                        id = inspection.id,
+                        equipment = inspection.equipment,
+                        inspector = inspection.inspector,
+                        supervisor = inspection.supervisor,
+                        horometer = inspection.horometer,
+                        date = inspection.date,
+                        isCompleted = inspection.isCompleted,
+                        items = emptyList() // We'll just show basic info for now
+                    )
+
+                    withContext(Dispatchers.Main) {
+                        selectedInspection = inspectionWithItems
+                    }
+                }
             } catch (e: Exception) {
-                // Manejar error
+                Log.e("HistoryViewModel", "Error loading inspection details", e)
+                errorMessage = "Error loading details: ${e.message}"
             } finally {
-                _isLoading.value = false
+                isLoading = false
             }
         }
     }
 
     fun clearSelectedInspection() {
-        _selectedInspection.value = null
+        selectedInspection = null
+    }
+
+    fun clearError() {
+        errorMessage = null
     }
 }
