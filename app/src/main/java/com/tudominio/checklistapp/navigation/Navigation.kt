@@ -114,11 +114,20 @@ fun SetupNavGraph(
             PostInspectionScreen(
                 controlInspectionId = controlInspectionId,
                 onNavigateBack = { navController.navigateUp() },
-                onInspectionCompleted = { navController.navigate(Screen.Home.route) },
+                onInspectionCompleted = {
+                    // Go back to home when completed, don't leave post inspection in backstack
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.EquipmentSelection.route) { inclusive = true }
+                    }
+                },
                 onNavigateToCamera = { questionId: String ->
+                    // Save the current state before navigating to camera
+                    postViewModel.saveCurrentStageForCamera()
                     navController.navigate(Screen.Camera.createRoute(questionId, VIEW_MODEL_POST))
                 },
                 onNavigateToPhotos = { questionId: String ->
+                    // Save the current state before navigating to photos
+                    postViewModel.saveCurrentStageForCamera()
                     navController.navigate(Screen.Photos.createRoute(questionId, VIEW_MODEL_POST))
                 },
                 viewModel = postViewModel
@@ -202,10 +211,16 @@ fun SetupNavGraph(
                         newViewModel.addPhotoToQuestion(questionId, uri.toString())
                     } else {
                         postViewModel.addPhotoToQuestion(questionId, uri.toString())
+                        // Restore the previous stage after taking a photo
+                        postViewModel.restoreStageAfterCamera()
                     }
                     navController.popBackStack()
                 },
                 onNavigateBack = {
+                    // For post-inspection, we need to restore the stage after canceling too
+                    if (viewModelType == VIEW_MODEL_POST) {
+                        postViewModel.restoreStageAfterCamera()
+                    }
                     navController.popBackStack()
                 }
             )
@@ -253,9 +268,17 @@ fun SetupNavGraph(
                         )
                     },
                     onSaveChanges = {
+                        // Restore stage after returning to the main flow from photos screen
+                        if (viewModelType == VIEW_MODEL_POST) {
+                            postViewModel.restoreStageAfterCamera()
+                        }
                         navController.popBackStack()
                     },
                     onNavigateBack = {
+                        // Restore stage after canceling too
+                        if (viewModelType == VIEW_MODEL_POST) {
+                            postViewModel.restoreStageAfterCamera()
+                        }
                         navController.popBackStack()
                     }
                 )
@@ -285,10 +308,16 @@ fun SetupNavGraph(
                         newViewModel.updatePhotoWithDrawing(questionId, photoId, drawingUri)
                     } else {
                         postViewModel.updatePhotoWithDrawing(questionId, photoId, drawingUri)
+                        // Restore stage when returning to the main flow
+                        postViewModel.restoreStageAfterCamera()
                     }
                     navController.popBackStack()
                 },
                 onNavigateBack = {
+                    // Restore stage when canceling too
+                    if (viewModelType == VIEW_MODEL_POST) {
+                        postViewModel.restoreStageAfterCamera()
+                    }
                     navController.popBackStack()
                 }
             )

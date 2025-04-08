@@ -88,6 +88,7 @@ fun NewInspectionScreen(
                             InspectionStage.CHECKLIST -> "Checklist de Inspección"
                             InspectionStage.SUMMARY -> "Resumen de Inspección"
                             InspectionStage.COMPLETED -> "Inspección Completada"
+                            else -> "Inspección" // Added else branch for exhaustiveness
                         }
                     )
                 },
@@ -137,6 +138,18 @@ fun NewInspectionScreen(
                         viewModel = viewModel,
                         onBackToHome = onInspectionCompleted
                     )
+                }
+                else -> {
+                    // Fallback for exhaustiveness
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Estado de inspección desconocido")
+                    }
                 }
             }
         }

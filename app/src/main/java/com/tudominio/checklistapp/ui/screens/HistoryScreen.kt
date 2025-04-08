@@ -350,7 +350,7 @@ fun InspectionCard(
                         fontWeight = FontWeight.Bold
                     )
 
-                    // Status chip
+                    // Status chip - Enhanced to show more information
                     Spacer(modifier = Modifier.height(4.dp))
                     StatusChip(isCompleted = inspection.isCompleted)
                 }

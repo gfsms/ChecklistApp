@@ -22,6 +22,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -70,6 +71,7 @@ fun PostInspectionScreen(
                             InspectionStage.CHECKLIST -> "Checklist de Entrega"
                             InspectionStage.SUMMARY -> "Resumen de Entrega"
                             InspectionStage.COMPLETED -> "Entrega Completada"
+                            else -> "Inspección de Entrega" // Added else branch for exhaustiveness
                         }
                     )
                 },
@@ -123,6 +125,18 @@ fun PostInspectionScreen(
                             onInspectionCompleted()
                         }
                     )
+                }
+                else -> {
+                    // Fallback for exhaustiveness
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("Estado de inspección desconocido")
+                    }
                 }
             }
         }
@@ -253,7 +267,7 @@ fun PostInspectionCompletedScreen(
             .fillMaxSize()
             .padding(16.dp),
         verticalArrangement = Arrangement.Center,
-        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "¡Inspección de Entrega Completada!",

@@ -85,6 +85,10 @@ class PostInspectionViewModel(application: Application) : AndroidViewModel(appli
     // Map to track finding types
     private val findingTypeMap = mutableMapOf<String, FindingType>()
 
+    // Flag to preserve stage when returning from camera
+    private var lastStageBeforeCamera: InspectionStage? = null
+    private var lastItemIndexBeforeCamera: Int = 0
+
     /**
      * Loads all control inspections
      */
@@ -93,9 +97,20 @@ class PostInspectionViewModel(application: Application) : AndroidViewModel(appli
             isLoading = true
             try {
                 repository?.getAllInspectionsList()?.let { inspections ->
-                    // Only include completed inspections
+                    // Only include completed inspections that don't have a corresponding post-inspection
                     val controlInspections = inspections.filter { it.isCompleted }
-                    _controlInspections.value = controlInspections
+
+                    // Additional filter to exclude inspections that already have post-inspections
+                    val equipmentWithPostInspection = inspections
+                        .filter { it.equipment.contains("POST-") }
+                        .map { it.equipment.substringAfter("POST-") }
+
+                    val filteredControlInspections = controlInspections.filter { inspection ->
+                        // Keep only inspections whose equipment doesn't have a post-inspection
+                        !equipmentWithPostInspection.contains(inspection.equipment)
+                    }
+
+                    _controlInspections.value = filteredControlInspections
                     applySearchFilter()
                 } ?: run {
                     Log.e(TAG, "Repository is null, cannot load inspections")
@@ -133,6 +148,26 @@ class PostInspectionViewModel(application: Application) : AndroidViewModel(appli
     }
 
     /**
+     * Save current stage before navigating to camera
+     */
+    fun saveCurrentStageForCamera() {
+        lastStageBeforeCamera = currentStage
+        lastItemIndexBeforeCamera = currentItemIndex
+        // Don't change current stage here - let navigation handle it
+    }
+
+    /**
+     * Restore stage after returning from camera
+     */
+    fun restoreStageAfterCamera() {
+        lastStageBeforeCamera?.let {
+            currentStage = it
+            currentItemIndex = lastItemIndexBeforeCamera
+            lastStageBeforeCamera = null
+        }
+    }
+
+    /**
      * Initializes a post-intervention inspection based on control inspection
      */
     fun initializePostInspection(controlInspectionId: String) {
@@ -142,10 +177,10 @@ class PostInspectionViewModel(application: Application) : AndroidViewModel(appli
                 repository?.getFullInspection(controlInspectionId)?.let { controlInspection ->
                     selectedControlInspection = controlInspection
 
-                    // Create new inspection based on control inspection
+                    // Create new inspection with a prefix to identify it as post-inspection
                     postInspection = Inspection(
                         id = UUID.randomUUID().toString(),
-                        equipment = controlInspection.equipment,
+                        equipment = "POST-${controlInspection.equipment}", // Add prefix for identification
                         inspector = "",
                         supervisor = "",
                         horometer = "",
@@ -479,5 +514,6 @@ class PostInspectionViewModel(application: Application) : AndroidViewModel(appli
         findingTypeMap.clear()
         saveSuccess = null
         errorMessage = null
+        lastStageBeforeCamera = null
     }
 }
