@@ -14,9 +14,12 @@ class ChecklistApplication : Application() {
     private val TAG = "ChecklistApplication"
 
     // Lazy initialization of database
-    private val database by lazy {
+    val database by lazy {
         try {
-            AppDatabase.getDatabase(this)
+            Log.d(TAG, "Initializing database...")
+            val db = AppDatabase.getDatabase(this)
+            Log.d(TAG, "Database initialized successfully")
+            db
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing database: ${e.message}", e)
             null
@@ -26,7 +29,14 @@ class ChecklistApplication : Application() {
     // Lazy initialization of DAO
     private val dao: InspectionDao? by lazy {
         try {
-            database?.inspectionDao()
+            Log.d(TAG, "Getting DAO...")
+            val result = database?.inspectionDao()
+            if (result != null) {
+                Log.d(TAG, "DAO obtained successfully")
+            } else {
+                Log.e(TAG, "DAO is null")
+            }
+            result
         } catch (e: Exception) {
             Log.e(TAG, "Error getting DAO: ${e.message}", e)
             null
@@ -35,12 +45,23 @@ class ChecklistApplication : Application() {
 
     // Repository with safe initialization
     val repository by lazy {
-        dao?.let { InspectionRepository(it) } ?: DummyRepository()
+        Log.d(TAG, "Initializing repository...")
+        dao?.let {
+            Log.d(TAG, "Creating real repository with DAO")
+            InspectionRepository(it)
+        } ?: run {
+            Log.e(TAG, "Creating dummy repository (DAO was null)")
+            DummyRepository()
+        }
     }
 
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "Application initialized")
+
+        // Trigger database initialization at startup to detect issues early
+        val dbInitialized = database != null
+        Log.d(TAG, "Database initialized on startup: $dbInitialized")
     }
 
     /**
@@ -49,7 +70,7 @@ class ChecklistApplication : Application() {
      */
     private inner class DummyRepository : InspectionRepository(EmptyDao()) {
         // This will just log errors instead of crashing
-        override fun logError(message: String, e: Exception?) {
+        override fun logError(message: String, e: Throwable?) {
             Log.e(TAG, "DummyRepository: $message", e)
         }
     }

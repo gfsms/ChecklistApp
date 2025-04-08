@@ -213,6 +213,29 @@ open class InspectionRepository(private val inspectionDao: InspectionDao) {
         }
     }
 
+
+    // Test database connection
+    suspend fun testDatabaseConnection(): Boolean {
+        return try {
+            Log.d(TAG, "Testing database connection...")
+            val inspections = inspectionDao.getAllInspectionsList()
+            Log.d(TAG, "Database connection test successful. Found ${inspections.size} inspections.")
+            true
+        } catch (e: Exception) {
+            logError("Database connection test failed", e)
+            false
+        }
+    }
+
+    // Get debugging string for inspections count
+    fun getInspectionsDebugInfo(): String {
+        return try {
+            "Repository initialized, ready to fetch inspections"
+        } catch (e: Exception) {
+            "Error in repository: ${e.message}"
+        }
+    }
+
     // Helper extension function to convert InspectionEntity to Inspection model
     private fun InspectionEntity.toInspectionModel(): Inspection {
         return Inspection(

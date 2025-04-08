@@ -36,7 +36,7 @@ fun DebugScreen(
     newInspectionViewModel: NewInspectionViewModel,
     debugViewModel: DebugViewModel = viewModel()
 ) {
-    val snackbarHostState = androidx.compose.material3.SnackbarHostState()
+    val snackbarHostState = SnackbarHostState()
 
     // Show any errors in the snackbar
     LaunchedEffect(debugViewModel.errorMessage) {
@@ -166,18 +166,46 @@ fun DebugScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                    Button(
+                        onClick = {
+                            debugViewModel.saveCurrentInspection(newInspectionViewModel)
+                        },
+                        enabled = !debugViewModel.isLoading && newInspectionViewModel.inspection.equipment.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Button(
-                            onClick = {
-                                debugViewModel.saveCurrentInspection(newInspectionViewModel)
-                            },
-                            enabled = !debugViewModel.isLoading && newInspectionViewModel.inspection.equipment.isNotBlank()
-                        ) {
-                            Text("Guardar Solo Datos Básicos")
-                        }
+                        Text("Guardar Solo Datos Básicos")
+                    }
+                    // Add this inside your Card with the "Guardar Solo Datos Básicos" button,
+// after that button but before closing the Column
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            // Add a reset function to DebugViewModel and call it here
+                            debugViewModel.resetDatabase()
+                        },
+                        enabled = !debugViewModel.isLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Red
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Reiniciar Base de Datos")
+                    }
+                    // Add this after the reset database button
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Button(
+                        onClick = {
+                            debugViewModel.runDiagnostics()
+                        },
+                        enabled = !debugViewModel.isLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Ejecutar Diagnóstico")
                     }
                 }
             }

@@ -1,4 +1,3 @@
-// app/src/main/java/com/tudominio/checklistapp/data/database/AppDatabase.kt
 package com.tudominio.checklistapp.data.database
 
 import android.content.Context
@@ -31,7 +30,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "checklist_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration() // Add this line to handle schema changes
+                    .build()
+
                 INSTANCE = instance
                 instance
             }

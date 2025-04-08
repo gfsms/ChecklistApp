@@ -26,7 +26,7 @@ import java.util.UUID
  * Se encarga de mantener el estado del formulario, validar los campos y
  * gestionar la navegación entre las diferentes etapas del proceso de inspección.
  */
-class NewInspectionViewModel(application: Application) : ViewModel() {
+class NewInspectionViewModel(application: Application) : AndroidViewModel(application) {
     private val TAG = "NewInspectionViewModel"
 
     // Repository instance from the Application class
@@ -295,24 +295,40 @@ class NewInspectionViewModel(application: Application) : ViewModel() {
 
         viewModelScope.launch {
             try {
+                // Log start of saving process
+                Log.d(TAG, "Starting to save inspection ${inspection.id}")
+
                 // Mark the inspection as completed
                 inspection = inspection.copy(isCompleted = true)
 
                 // Check if repository is available
                 if (repository == null) {
+                    Log.e(TAG, "Repository is null, cannot save inspection")
                     saveSuccess = false
                     errorMessage = "No se pudo acceder al repositorio de datos."
+                    isSaving = false
                     return@launch
                 }
 
                 // Save to the database using the repository
                 val result = withContext(Dispatchers.IO) {
-                    repository.saveInspection(inspection)
+                    try {
+                        Log.d(TAG, "Calling repository.saveInspection...")
+                        val success = repository.saveInspection(inspection)
+                        Log.d(TAG, "Save operation result: $success")
+                        success
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Database error while saving: ${e.message}", e)
+                        false
+                    }
                 }
 
                 saveSuccess = result
                 if (!result) {
+                    Log.e(TAG, "Save operation returned false")
                     errorMessage = "No se pudo guardar la inspección en la base de datos."
+                } else {
+                    Log.d(TAG, "Inspection saved successfully")
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving inspection: ${e.message}", e)

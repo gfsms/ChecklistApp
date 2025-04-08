@@ -7,14 +7,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.tudominio.checklistapp.ChecklistApplication
 import com.tudominio.checklistapp.data.database.AppDatabase
 import com.tudominio.checklistapp.data.database.InspectionEntity
 import com.tudominio.checklistapp.data.repository.DebugRepository
 import kotlinx.coroutines.launch
 
-/**
- * A simplified ViewModel to debug database access issues
- */
 class DebugViewModel(application: Application) : AndroidViewModel(application) {
 
     private val TAG = "DebugViewModel"
@@ -34,10 +32,18 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     init {
-        val database = AppDatabase.getDatabase(application)
+        // Safe database initialization with error handling
+        val database = try {
+            (application as ChecklistApplication).database
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get database from application: ${e.message}", e)
+            null
+        }
+
+        // Initialize repository with null-safe approach
         repository = DebugRepository(database)
 
-        // Test database access immediately
+        // Test database access immediately but safely
         testDatabaseAccess()
     }
 
@@ -66,7 +72,59 @@ class DebugViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+    fun runDiagnostics() {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
 
+            val diagnosticResults = StringBuilder()
+
+            // Check if Application class is providing repository
+            val app = getApplication<ChecklistApplication>()
+            diagnosticResults.append("App class: ${app::class.java.simpleName}\n")
+
+            // Check if repository is available
+            val repo = app.repository
+            diagnosticResults.append("Repository available: ${repo != null}\n")
+
+            // Check if database is available
+            val db = app.database
+            diagnosticResults.append("Database available: ${db != null}\n")
+
+            // Check if DAO can be obtained
+            val dao = db?.inspectionDao()
+            diagnosticResults.append("DAO available: ${dao != null}\n")
+
+            // If we reach here, show the results
+            Log.d(TAG, "Diagnostics results:\n$diagnosticResults")
+            errorMessage = "Resultados de diagnóstico:\n$diagnosticResults"
+
+            isLoading = false
+        }
+    }
+    fun resetDatabase() {
+        viewModelScope.launch {
+            isLoading = true
+            errorMessage = null
+
+            try {
+                val result = repository.resetDatabase()
+                if (result) {
+                    Log.d(TAG, "Database reset successful")
+                    // Refresh database connection test
+                    testDatabaseAccess()
+                } else {
+                    Log.e(TAG, "Database reset failed")
+                    errorMessage = "No se pudo reiniciar la base de datos"
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error resetting database: ${e.message}", e)
+                errorMessage = "Error: ${e.message}"
+            } finally {
+                isLoading = false
+            }
+        }
+    }
     fun loadInspections() {
         viewModelScope.launch {
             isLoading = true

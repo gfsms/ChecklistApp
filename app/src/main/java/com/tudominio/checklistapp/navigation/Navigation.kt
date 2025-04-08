@@ -22,6 +22,7 @@ sealed class Screen(val route: String) {
     object NewInspection : Screen("new_inspection_screen")
     object History : Screen("history_screen")
     object Dashboard : Screen("dashboard_screen")
+    object Debug : Screen("debug_screen") // New Debug Screen
     object Camera : Screen("camera_screen/{questionId}") {
         fun createRoute(questionId: String) = "camera_screen/$questionId"
     }
@@ -68,6 +69,9 @@ fun SetupNavGraph(
                 onNavigateToHistory = {
                     navController.navigate(Screen.History.route)
                 },
+                onNavigateToDebug = {
+                    navController.navigate(Screen.Debug.route)
+                },
                 viewModel = viewModel
             )
         }
@@ -102,6 +106,14 @@ fun SetupNavGraph(
             DashboardScreen(
                 onNavigateBack = { navController.navigateUp() },
                 inspection = viewModel.inspection.takeIf { it.isCompleted }
+            )
+        }
+
+        // Debug Screen
+        composable(route = Screen.Debug.route) {
+            DebugScreen(
+                onNavigateBack = { navController.navigateUp() },
+                newInspectionViewModel = viewModel
             )
         }
 

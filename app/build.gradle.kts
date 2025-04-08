@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     // No necesitamos un plugin específico para Compose, solo habilitarlo en buildFeatures
+    id("com.google.devtools.ksp") version "1.9.0-1.0.13"
 }
 
 android {
@@ -91,4 +92,7 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     annotationProcessor("androidx.room:room-compiler:2.6.1")
+    debugImplementation("androidx.room:room-testing:2.6.1")
+    ksp("androidx.room:room-compiler:2.6.1")
+
 }

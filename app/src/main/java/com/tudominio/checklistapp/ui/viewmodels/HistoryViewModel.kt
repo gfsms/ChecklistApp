@@ -13,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -63,10 +64,56 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
             errorMessage = null
 
             try {
+                Log.d(TAG, "Starting to load inspections...")
+
+                // First check database connectivity
+                val isConnected = try {
+                    withContext(Dispatchers.IO) {
+                        Log.d(TAG, "Testing database connection...")
+                        val result = repository.testDatabaseConnection()
+                        Log.d(TAG, "Database connection test result: $result")
+                        result
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Database connection test failed: ${e.message}", e)
+                    false
+                }
+
+                if (!isConnected) {
+                    Log.e(TAG, "Database connection test failed, can't load inspections")
+                    isLoading = false
+                    errorMessage = "No se pudo conectar a la base de datos. Verifique la conexión y vuelva a intentarlo."
+                    return@launch
+                }
+
                 // Collect inspections from Flow
-                repository.allInspections.collectLatest { inspectionList ->
-                    val filteredList = filterInspections(inspectionList, searchQuery, selectedFilter)
-                    _inspections.value = filteredList
+                try {
+                    Log.d(TAG, "Setting up flow collection...")
+
+                    // Use direct list loading for simpler debugging first
+                    val list = withContext(Dispatchers.IO) {
+                        repository.getAllInspectionsList()
+                    }
+
+                    Log.d(TAG, "Directly loaded ${list.size} inspections")
+
+                    // Now set up the flow
+                    repository.allInspections
+                        .catch { e ->
+                            Log.e(TAG, "Error in inspection flow: ${e.message}", e)
+                            errorMessage = "Error al recibir datos: ${e.message}"
+                            emit(emptyList())
+                        }
+                        .collectLatest { inspectionList ->
+                            Log.d(TAG, "Flow emitted ${inspectionList.size} inspections")
+                            val filteredList = filterInspections(inspectionList, searchQuery, selectedFilter)
+                            Log.d(TAG, "After filtering: ${filteredList.size} inspections")
+                            _inspections.value = filteredList
+                            isLoading = false
+                        }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error setting up collection: ${e.message}", e)
+                    errorMessage = "Error al configurar la colección de datos: ${e.message}"
                     isLoading = false
                 }
             } catch (e: Exception) {
