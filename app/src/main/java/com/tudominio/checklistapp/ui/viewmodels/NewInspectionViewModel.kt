@@ -22,9 +22,15 @@ import java.time.LocalDateTime
 import java.util.UUID
 
 /**
- * ViewModel que gestiona el estado y la lógica de la pantalla de Nueva Inspección.
- * Se encarga de mantener el estado del formulario, validar los campos y
- * gestionar la navegación entre las diferentes etapas del proceso de inspección.
+ * Equipment types available for inspection
+ */
+enum class EquipmentType(val displayName: String) {
+    CAEX_797F("CAEX 797F"),
+    CAEX_798AC("CAEX 798AC")
+}
+
+/**
+ * ViewModel that manages the state and logic of the New Inspection screen.
  */
 class NewInspectionViewModel(application: Application) : AndroidViewModel(application) {
     private val TAG = "NewInspectionViewModel"
@@ -37,30 +43,37 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
         null
     }
 
-    // Estado de la inspección actual
+    // Current inspection state
     var inspection by mutableStateOf(Inspection())
         private set
 
-    // Estado de la pantalla
+    // Equipment type and number state
+    var selectedEquipmentType by mutableStateOf(EquipmentType.CAEX_797F)
+        private set
+
+    var equipmentNumber by mutableStateOf("")
+        private set
+
+    // Screen state
     var isLoading by mutableStateOf(false)
         private set
 
-    // Estado de guardado
+    // Save state
     var isSaving by mutableStateOf(false)
         private set
 
-    // Estado de éxito o error de guardado
+    // Success or error state
     var saveSuccess by mutableStateOf<Boolean?>(null)
         private set
 
     var errorMessage by mutableStateOf<String?>(null)
         private set
 
-    // Etapa actual del proceso de inspección
+    // Current inspection stage
     var currentStage by mutableStateOf(InspectionStage.INITIAL_INFO)
         private set
 
-    // Estado de errores en los campos
+    // Field error states
     var equipmentError by mutableStateOf(false)
         private set
     var inspectorError by mutableStateOf(false)
@@ -70,20 +83,43 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     var horometerError by mutableStateOf(false)
         private set
 
-    // Índice del ítem actual en el checklist
+    // Current item index
     var currentItemIndex by mutableStateOf(0)
         private set
 
     /**
-     * Actualiza el campo equipo y valida su contenido.
+     * Updates the equipment type
      */
-    fun updateEquipment(value: String) {
-        inspection = inspection.copy(equipment = value)
-        equipmentError = value.isBlank()
+    fun updateEquipmentType(type: EquipmentType) {
+        selectedEquipmentType = type
+        // Update the formatted equipment ID
+        updateFormattedEquipment()
     }
 
     /**
-     * Actualiza el campo inspector y valida su contenido.
+     * Updates the equipment number and validates it
+     */
+    fun updateEquipmentNumber(value: String) {
+        equipmentNumber = value
+        equipmentError = value.isBlank()
+        // Update the formatted equipment ID
+        updateFormattedEquipment()
+    }
+
+    /**
+     * Updates the formatted equipment field in the inspection
+     */
+    private fun updateFormattedEquipment() {
+        val formattedEquipment = if (equipmentNumber.isNotBlank()) {
+            "${selectedEquipmentType.displayName} $equipmentNumber"
+        } else {
+            ""
+        }
+        inspection = inspection.copy(equipment = formattedEquipment)
+    }
+
+    /**
+     * Updates the inspector field and validates it
      */
     fun updateInspector(value: String) {
         inspection = inspection.copy(inspector = value)
@@ -91,7 +127,7 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Actualiza el campo supervisor y valida su contenido.
+     * Updates the supervisor field and validates it
      */
     fun updateSupervisor(value: String) {
         inspection = inspection.copy(supervisor = value)
@@ -99,7 +135,7 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Actualiza el campo horómetro y valida su contenido.
+     * Updates the horometer field and validates it
      */
     fun updateHorometer(value: String) {
         inspection = inspection.copy(horometer = value)
@@ -107,11 +143,11 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Valida si todos los campos iniciales están completos.
-     * @return true si todos los campos necesarios están completos, false en caso contrario.
+     * Validates if all initial fields are complete
+     * @return true if all required fields are complete, false otherwise
      */
     fun validateInitialFields(): Boolean {
-        equipmentError = inspection.equipment.isBlank()
+        equipmentError = equipmentNumber.isBlank()
         inspectorError = inspection.inspector.isBlank()
         supervisorError = inspection.supervisor.isBlank()
         horometerError = inspection.horometer.isBlank()
@@ -120,45 +156,58 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Avanza a la siguiente etapa del proceso de inspección.
+     * Advances to the next stage of the inspection process
      */
     fun proceedToNextStage() {
         when (currentStage) {
             InspectionStage.INITIAL_INFO -> {
                 if (validateInitialFields()) {
-                    // Solo avanzamos si todos los campos están completos
+                    // Only proceed if all fields are complete
                     loadChecklistItems()
                     currentStage = InspectionStage.CHECKLIST
                 }
             }
             InspectionStage.CHECKLIST -> {
                 if (currentItemIndex < inspection.items.size - 1) {
-                    // Avanzar al siguiente ítem del checklist
+                    // Advance to the next checklist item
                     currentItemIndex++
                 } else {
-                    // Si hemos completado todos los ítems, avanzamos al resumen
+                    // If we've completed all items, advance to summary
                     currentStage = InspectionStage.SUMMARY
                 }
             }
             InspectionStage.SUMMARY -> {
-                // Finalizar la inspección
+                // Finalize the inspection
                 saveInspection()
                 currentStage = InspectionStage.COMPLETED
             }
             InspectionStage.COMPLETED -> {
-                // No hay más etapas
+                // No more stages
             }
         }
     }
 
     /**
-     * Carga los ítems del checklist para la inspección con datos reales.
+     * Loads checklist items for the inspection with real data
      */
     private fun loadChecklistItems() {
         isLoading = true
 
-        // Crear los 8 ítems con sus respectivas preguntas
-        val items = listOf(
+        // Create items with their respective questions based on equipment type
+        val items = when (selectedEquipmentType) {
+            EquipmentType.CAEX_797F -> loadCAEX797FItems()
+            EquipmentType.CAEX_798AC -> loadCAEX798ACItems()
+        }
+
+        inspection = inspection.copy(items = items)
+        isLoading = false
+    }
+
+    /**
+     * Loads checklist items specific to CAEX 797F
+     */
+    private fun loadCAEX797FItems(): List<InspectionItem> {
+        return listOf(
             // Item 1: Condiciones Generales
             createItem(
                 id = "item1",
@@ -264,13 +313,94 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
                 )
             )
         )
-
-        inspection = inspection.copy(items = items)
-        isLoading = false
     }
 
     /**
-     * Crea un ítem de inspección con sus preguntas.
+     * Loads checklist items specific to CAEX 798AC
+     */
+    private fun loadCAEX798ACItems(): List<InspectionItem> {
+        return listOf(
+            // Sample items for 798AC - to be replaced with real questions later
+            createItem(
+                id = "item1",
+                name = "Sistema Eléctrico 798AC",
+                questions = listOf(
+                    "Panel de control principal en buen estado",
+                    "Conexiones eléctricas sin daños visibles",
+                    "Sistema de iluminación funciona correctamente",
+                    "Baterías y conexiones en buen estado"
+                )
+            ),
+            createItem(
+                id = "item2",
+                name = "Sistema Hidráulico 798AC",
+                questions = listOf(
+                    "Mangueras hidráulicas sin fugas",
+                    "Nivel de aceite hidráulico correcto",
+                    "Bombas hidráulicas sin ruidos anormales",
+                    "Filtros hidráulicos limpios y en buen estado"
+                )
+            ),
+            createItem(
+                id = "item3",
+                name = "Sistema de Propulsión 798AC",
+                questions = listOf(
+                    "Motor principal en buen estado",
+                    "Sistema de transmisión sin ruidos anormales",
+                    "Convertidor de par funciona correctamente",
+                    "Frenos de servicio operativos"
+                )
+            ),
+            createItem(
+                id = "item4",
+                name = "Sistema de Frenos 798AC",
+                questions = listOf(
+                    "Frenos en buen estado",
+                    "Sistema antibloqueo funcional",
+                    "Sin fugas en el sistema de frenos"
+                )
+            ),
+            createItem(
+                id = "item5",
+                name = "Sistema de Suspensión 798AC",
+                questions = listOf(
+                    "Suspensiones en buen estado",
+                    "Sin fugas de aceite en amortiguadores",
+                    "Sin ruidos anormales al operar"
+                )
+            ),
+            createItem(
+                id = "item6",
+                name = "Sistema de Control 798AC",
+                questions = listOf(
+                    "Dispositivos de control funcionando correctamente",
+                    "Pantallas operativas sin errores",
+                    "Sensores calibrados y operativos"
+                )
+            ),
+            createItem(
+                id = "item7",
+                name = "Equipo de Seguridad 798AC",
+                questions = listOf(
+                    "Extintores en buen estado y vigentes",
+                    "Sistema de parada de emergencia funcionando",
+                    "Alarmas y bocinas operativas"
+                )
+            ),
+            createItem(
+                id = "item8",
+                name = "Estructura General 798AC",
+                questions = listOf(
+                    "Sin daños visibles en estructura",
+                    "Sin fisuras en componentes críticos",
+                    "Barandas de seguridad intactas"
+                )
+            )
+        )
+    }
+
+    /**
+     * Creates an inspection item with its questions
      */
     private fun createItem(id: String, name: String, questions: List<String>): InspectionItem {
         return InspectionItem(
@@ -286,7 +416,7 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Guarda la inspección completada en la base de datos.
+     * Saves the completed inspection to the database
      */
     private fun saveInspection() {
         isSaving = true
@@ -341,147 +471,147 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Actualiza la respuesta de una pregunta específica.
+     * Updates the answer to a specific question
      *
-     * @param question La pregunta que se está actualizando
-     * @param answer La nueva respuesta para la pregunta
+     * @param question The question being updated
+     * @param answer The new answer for the question
      */
     fun updateQuestionAnswer(question: InspectionQuestion, answer: Answer) {
-        // Primero, obtenemos el ítem actual basado en el índice
+        // First, get the current item based on the index
         if (currentItemIndex < 0 || currentItemIndex >= inspection.items.size) {
-            return // Índice de ítem inválido
+            return // Invalid item index
         }
 
         val currentItems = inspection.items.toMutableList()
         val currentItem = currentItems[currentItemIndex]
 
-        // Buscamos la pregunta específica dentro del ítem actual
+        // Find the specific question within the current item
         val questions = currentItem.questions.toMutableList()
         val questionIndex = questions.indexOfFirst { it.id == question.id }
 
         if (questionIndex != -1) {
-            // Si la pregunta ya tenía respuesta, conservamos sus fotos
+            // If the question already had an answer, keep its photos
             val existingPhotos = questions[questionIndex].answer?.photos ?: emptyList()
 
-            // Solo actualizamos las fotos si la nueva respuesta no las incluye
+            // Only update the photos if the new answer doesn't include them
             val updatedAnswer = if (answer.photos.isEmpty()) {
                 answer.copy(photos = existingPhotos)
             } else {
                 answer
             }
 
-            // Actualizamos la pregunta con la nueva respuesta
+            // Update the question with the new answer
             questions[questionIndex] = questions[questionIndex].copy(answer = updatedAnswer)
 
-            // Creamos un nuevo ítem con las preguntas actualizadas
+            // Create a new item with the updated questions
             val updatedItem = currentItem.copy(questions = questions)
 
-            // Actualizamos la lista de ítems
+            // Update the items list
             currentItems[currentItemIndex] = updatedItem
 
-            // Actualizamos la inspección completa
+            // Update the complete inspection
             inspection = inspection.copy(items = currentItems)
         }
     }
 
     /**
-     * Añade una foto a una pregunta específica.
+     * Adds a photo to a specific question
      *
-     * @param questionId ID de la pregunta a la que se añade la foto
-     * @param photoUri URI de la foto tomada
+     * @param questionId ID of the question to add the photo to
+     * @param photoUri URI of the photo taken
      */
     fun addPhotoToQuestion(questionId: String, photoUri: String) {
         val question = getQuestionById(questionId) ?: return
 
-        // Creamos un nuevo objeto Photo
+        // Create a new Photo object
         val newPhoto = Photo(
             uri = photoUri,
             timestamp = LocalDateTime.now()
         )
 
-        // Obtenemos la respuesta actual o creamos una nueva si no existe
+        // Get the current answer or create a new one if it doesn't exist
         val currentAnswer = question.answer ?: Answer(isConform = false)
 
-        // Añadimos la nueva foto a la lista existente
+        // Add the new photo to the existing list
         val updatedPhotos = currentAnswer.photos.toMutableList().apply {
             add(newPhoto)
         }
 
-        // Creamos una respuesta actualizada con la nueva foto
+        // Create an updated answer with the new photo
         val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
 
-        // Actualizamos la pregunta con la nueva respuesta
+        // Update the question with the new answer
         updateQuestionWithAnswer(questionId, updatedAnswer)
     }
 
     /**
-     * Elimina una foto de una pregunta específica.
+     * Removes a photo from a specific question
      *
-     * @param questionId ID de la pregunta de la que se elimina la foto
-     * @param photo La foto a eliminar
+     * @param questionId ID of the question to remove the photo from
+     * @param photo The photo to remove
      */
     fun removePhotoFromQuestion(questionId: String, photo: Photo) {
         val question = getQuestionById(questionId) ?: return
 
-        // Obtenemos la respuesta actual
+        // Get the current answer
         val currentAnswer = question.answer ?: return
 
-        // Eliminamos la foto de la lista
+        // Remove the photo from the list
         val updatedPhotos = currentAnswer.photos.filter { it.id != photo.id }
 
-        // Creamos una respuesta actualizada sin la foto eliminada
+        // Create an updated answer without the removed photo
         val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
 
-        // Actualizamos la pregunta con la nueva respuesta
+        // Update the question with the new answer
         updateQuestionWithAnswer(questionId, updatedAnswer)
     }
 
     /**
-     * Actualiza una foto con los dibujos realizados.
+     * Updates a photo with drawings
      *
-     * @param questionId ID de la pregunta que contiene la foto
-     * @param photoId ID de la foto a actualizar
-     * @param drawingUri URI de la imagen con los dibujos
+     * @param questionId ID of the question containing the photo
+     * @param photoId ID of the photo to update
+     * @param drawingUri URI of the image with drawings
      */
     fun updatePhotoWithDrawing(questionId: String, photoId: String, drawingUri: String) {
         val question = getQuestionById(questionId) ?: return
 
-        // Obtenemos la respuesta actual
+        // Get the current answer
         val currentAnswer = question.answer ?: return
 
-        // Encontramos la foto a actualizar
+        // Find the photo to update
         val photoIndex = currentAnswer.photos.indexOfFirst { it.id == photoId }
         if (photoIndex == -1) return
 
-        // Obtenemos la foto actual
+        // Get the current photo
         val photo = currentAnswer.photos[photoIndex]
 
-        // Creamos una nueva foto con la información del dibujo
+        // Create a new photo with the drawing information
         val updatedPhoto = photo.copy(
             hasDrawings = true,
             drawingUri = drawingUri
         )
 
-        // Actualizamos la lista de fotos
+        // Update the photos list
         val updatedPhotos = currentAnswer.photos.toMutableList().apply {
             set(photoIndex, updatedPhoto)
         }
 
-        // Creamos una respuesta actualizada con la foto modificada
+        // Create an updated answer with the modified photo
         val updatedAnswer = currentAnswer.copy(photos = updatedPhotos)
 
-        // Actualizamos la pregunta con la nueva respuesta
+        // Update the question with the new answer
         updateQuestionWithAnswer(questionId, updatedAnswer)
     }
 
     /**
-     * Actualiza una pregunta con una nueva respuesta.
+     * Updates a question with a new answer
      *
-     * @param questionId ID de la pregunta a actualizar
-     * @param answer La nueva respuesta
+     * @param questionId ID of the question to update
+     * @param answer The new answer
      */
     private fun updateQuestionWithAnswer(questionId: String, answer: Answer) {
-        // Buscamos el ítem y la pregunta
+        // Find the item and question
         val items = inspection.items.toMutableList()
 
         for (i in items.indices) {
@@ -490,13 +620,13 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
 
             val questionIndex = questions.indexOfFirst { it.id == questionId }
             if (questionIndex != -1) {
-                // Actualizamos la pregunta con la nueva respuesta
+                // Update the question with the new answer
                 questions[questionIndex] = questions[questionIndex].copy(answer = answer)
 
-                // Actualizamos el ítem con las preguntas actualizadas
+                // Update the item with the updated questions
                 items[i] = item.copy(questions = questions)
 
-                // Actualizamos la inspección completa
+                // Update the complete inspection
                 inspection = inspection.copy(items = items)
                 return
             }
@@ -504,10 +634,10 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Busca una pregunta por su ID.
+     * Finds a question by its ID
      *
-     * @param questionId ID de la pregunta a buscar
-     * @return La pregunta encontrada o null si no existe
+     * @param questionId ID of the question to find
+     * @return The question found or null if it doesn't exist
      */
     fun getQuestionById(questionId: String): InspectionQuestion? {
         inspection.items.forEach { item ->
@@ -521,30 +651,30 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Retrocede a la etapa anterior en el proceso de inspección.
+     * Goes back to the previous stage in the inspection process
      */
     fun goBack(): Boolean {
         return when (currentStage) {
-            InspectionStage.INITIAL_INFO -> false // No hay paso anterior
+            InspectionStage.INITIAL_INFO -> false // No previous step
             InspectionStage.CHECKLIST -> {
                 if (currentItemIndex > 0) {
-                    // Retroceder al ítem anterior
+                    // Go back to the previous item
                     currentItemIndex--
                     true
                 } else {
-                    // Volver a la información inicial
+                    // Return to initial information
                     currentStage = InspectionStage.INITIAL_INFO
                     true
                 }
             }
             InspectionStage.SUMMARY -> {
-                // Volver al último ítem del checklist
+                // Return to the last checklist item
                 currentStage = InspectionStage.CHECKLIST
                 currentItemIndex = inspection.items.size - 1
                 true
             }
             InspectionStage.COMPLETED -> {
-                // Volver al resumen
+                // Return to summary
                 currentStage = InspectionStage.SUMMARY
                 true
             }
@@ -552,11 +682,13 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Reinicia la inspección a su estado inicial.
-     * Útil cuando se quiere comenzar una nueva inspección.
+     * Resets the inspection to its initial state
+     * Useful when starting a new inspection
      */
     fun resetInspection() {
         inspection = Inspection()
+        equipmentNumber = ""
+        selectedEquipmentType = EquipmentType.CAEX_797F
         currentStage = InspectionStage.INITIAL_INFO
         currentItemIndex = 0
         equipmentError = false
@@ -570,32 +702,9 @@ class NewInspectionViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /**
-     * Limpia el mensaje de error
+     * Clears the error message
      */
     fun clearError() {
         errorMessage = null
     }
-}
-
-/**
- * Factory class for creating NewInspectionViewModel with application parameter
- */
-class NewInspectionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(NewInspectionViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return NewInspectionViewModel(application) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-
-/**
- * Enumera las diferentes etapas del proceso de inspección.
- */
-enum class InspectionStage {
-    INITIAL_INFO,   // Ingreso de información inicial (equipo, inspector, supervisor)
-    CHECKLIST,      // Completar el checklist de inspección
-    SUMMARY,        // Resumen de la inspección realizada
-    COMPLETED       // Inspección completada y guardada
 }

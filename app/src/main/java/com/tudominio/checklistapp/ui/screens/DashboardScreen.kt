@@ -3,6 +3,7 @@ package com.tudominio.checklistapp.ui.screens
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -26,8 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.tudominio.checklistapp.data.model.Inspection
-import com.tudominio.checklistapp.ui.components.AnalyticsDashboard
-import com.tudominio.checklistapp.ui.components.ChartSection
 import com.tudominio.checklistapp.ui.components.ExportComponent
 import com.tudominio.checklistapp.ui.components.SettingsScreen
 
@@ -38,7 +37,7 @@ fun DashboardScreen(
     inspection: Inspection? = null
 ) {
     var selectedTabIndex by remember { mutableStateOf(0) }
-    val tabs = listOf("Resumen", "Gráficos", "Exportar", "Configuración")
+    val tabs = listOf("Exportar", "Configuración")
 
     var isLoading by remember { mutableStateOf(false) }
 
@@ -86,15 +85,7 @@ fun DashboardScreen(
                 }
             } else {
                 when (selectedTabIndex) {
-                    0 -> AnalyticsDashboard(
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-
-                    1 -> ChartSection(
-                        modifier = Modifier.padding(vertical = 16.dp)
-                    )
-
-                    2 -> {
+                    0 -> {
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -121,7 +112,7 @@ fun DashboardScreen(
                         }
                     }
 
-                    3 -> SettingsScreen()
+                    1 -> SettingsScreen()
                 }
             }
         }

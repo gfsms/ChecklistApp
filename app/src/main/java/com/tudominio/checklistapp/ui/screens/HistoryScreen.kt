@@ -28,6 +28,7 @@ import java.time.format.DateTimeFormatter
 fun HistoryScreen(
     onNavigateBack: () -> Unit,
     onNavigateToDashboard: () -> Unit = {},
+    onNavigateToDetail: (String) -> Unit = {},
     viewModel: HistoryViewModel = viewModel()
 ) {
     // Collect inspections from StateFlow
@@ -249,6 +250,9 @@ fun HistoryScreen(
                             onDeleteInspection = {
                                 inspectionToDelete = inspection.id
                                 showDeleteDialog = true
+                            },
+                            onSelectInspection = {
+                                onNavigateToDetail(inspection.id)
                             }
                         )
                     }
@@ -299,7 +303,8 @@ fun FilterChipGroup(
 @Composable
 fun InspectionCard(
     inspection: Inspection,
-    onDeleteInspection: () -> Unit
+    onDeleteInspection: () -> Unit,
+    onSelectInspection: () -> Unit
 ) {
     val dateFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
     val formattedDate = inspection.date.format(dateFormatter)
@@ -326,7 +331,7 @@ fun InspectionCard(
             .fillMaxWidth()
             .padding(vertical = 4.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        onClick = { /* Future: Navigate to inspection details */ }
+        onClick = onSelectInspection
     ) {
         Column(
             modifier = Modifier
@@ -338,11 +343,17 @@ fun InspectionCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = inspection.equipment,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                Column {
+                    Text(
+                        text = inspection.equipment,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    // Status chip
+                    Spacer(modifier = Modifier.height(4.dp))
+                    StatusChip(isCompleted = inspection.isCompleted)
+                }
 
                 Row {
                     IconButton(
@@ -403,6 +414,35 @@ fun InspectionCard(
                     .height(8.dp),
                 color = conformityColor,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+fun StatusChip(isCompleted: Boolean) {
+    Surface(
+        color = if (isCompleted) Green.copy(alpha = 0.2f) else Yellow.copy(alpha = 0.2f),
+        shape = MaterialTheme.shapes.small
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Pending,
+                contentDescription = null,
+                tint = if (isCompleted) Green else Yellow,
+                modifier = Modifier.size(14.dp)
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Text(
+                text = if (isCompleted) "Finalizada" else "En progreso",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (isCompleted) Green else Yellow,
+                fontWeight = FontWeight.Medium
             )
         }
     }

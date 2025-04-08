@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,6 +22,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -33,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tudominio.checklistapp.ui.components.LabeledTextField
 import com.tudominio.checklistapp.ui.components.NumericTextField
 import com.tudominio.checklistapp.ui.components.PrimaryButton
+import com.tudominio.checklistapp.ui.viewmodels.EquipmentType
 import com.tudominio.checklistapp.ui.viewmodels.InspectionStage
 import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
 
@@ -48,12 +53,6 @@ import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
  * Pantalla principal para crear una nueva inspección.
  * Gestiona todo el flujo desde el ingreso de datos iniciales
  * hasta la finalización de la inspección.
- *
- * @param onNavigateBack Función para navegar hacia atrás
- * @param onInspectionCompleted Función que se llama cuando se completa la inspección
- * @param viewModel ViewModel compartido para esta pantalla
- * @param onNavigateToCamera Función para navegar a la pantalla de cámara
- * @param onNavigateToPhotos Función para navegar a la pantalla de gestión de fotos
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,16 +63,16 @@ fun NewInspectionScreen(
     onNavigateToCamera: (String) -> Unit = {},
     onNavigateToPhotos: (String) -> Unit = {}
 ) {
-    // Agregamos un efecto para debug
+    // Add debug effect
     LaunchedEffect(key1 = true) {
-        println("NewInspectionScreen composición inicial")
+        println("NewInspectionScreen initial composition")
     }
 
-    // Función para manejar la navegación hacia atrás
+    // Function to handle back navigation
     val handleBackNavigation = {
         val navigatedBack = viewModel.goBack()
-        // Si no pudimos navegar hacia atrás en el flujo de inspección,
-        // volvemos a la pantalla anterior
+        // If we couldn't navigate back in the inspection flow,
+        // return to the previous screen
         if (!navigatedBack) {
             onNavigateBack()
         }
@@ -114,7 +113,7 @@ fun NewInspectionScreen(
                 .padding(paddingValues),
             color = MaterialTheme.colorScheme.background
         ) {
-            // Mostramos la etapa actual del proceso de inspección
+            // Show the current stage of the inspection process
             when (viewModel.currentStage) {
                 InspectionStage.INITIAL_INFO -> {
                     InitialInfoForm(viewModel)
@@ -145,34 +144,35 @@ fun NewInspectionScreen(
 }
 
 /**
- * Formulario para ingresar la información inicial de la inspección:
- * equipo, inspector, supervisor y horómetro.
+ * Form for entering initial inspection information:
+ * equipment, inspector, supervisor and horometer.
  */
 @Composable
 fun InitialInfoForm(viewModel: NewInspectionViewModel) {
-    var equipmentValue by remember { mutableStateOf(viewModel.inspection.equipment) }
+    var equipmentNumberValue by remember { mutableStateOf(viewModel.equipmentNumber) }
     var isCustomEquipment by remember { mutableStateOf(false) }
 
-    // Validate CAEX ID format
-    fun validateEquipment(value: String): Boolean {
+    // Validate equipment ID format
+    fun validateEquipment(value: String, equipmentType: EquipmentType): Boolean {
         if (value.isBlank()) return false
 
-        val caexPattern = "^CAEX (\\d{3})$".toRegex()
-        val match = caexPattern.find(value)
+        try {
+            val caexNumber = value.toInt()
 
-        if (match != null) {
-            val caexNumber = match.groupValues[1].toInt()
-            return (caexNumber in 301..339) || caexNumber == 365 || caexNumber == 366
+            return when (equipmentType) {
+                EquipmentType.CAEX_797F -> (caexNumber in 301..339) || caexNumber == 365 || caexNumber == 366
+                EquipmentType.CAEX_798AC -> caexNumber in 340..352
+            }
+        } catch (e: NumberFormatException) {
+            return false
         }
-
-        return false
     }
 
     // Verify and update equipment
     fun updateEquipmentValue(value: String) {
-        equipmentValue = value
-        isCustomEquipment = !validateEquipment(value)
-        viewModel.updateEquipment(value)
+        equipmentNumberValue = value
+        isCustomEquipment = !validateEquipment(value, viewModel.selectedEquipmentType)
+        viewModel.updateEquipmentNumber(value)
     }
 
     Column(
@@ -182,7 +182,7 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Título del formulario
+        // Form title
         Text(
             text = "Información Inicial",
             style = MaterialTheme.typography.titleLarge,
@@ -215,7 +215,9 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Complete los datos del equipo que está inspeccionando. El formato del equipo debe ser 'CAEX XXX' donde XXX es el número de identificación (301-339, 365 o 366).",
+                    text = "Complete los datos del equipo que está inspeccionando.\n" +
+                            "1. Seleccione el tipo de CAEX\n" +
+                            "2. Ingrese solo el número de identificación del equipo",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -223,25 +225,93 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Campo para el equipo (con formato CAEX XXX)
+        // Equipment type selection
+        Card(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text(
+                    text = "Tipo de Equipo",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    modifier = Modifier.selectableGroup()
+                ) {
+                    EquipmentType.values().forEach { equipmentType ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (viewModel.selectedEquipmentType == equipmentType),
+                                    onClick = {
+                                        viewModel.updateEquipmentType(equipmentType)
+                                        // Revalidate equipment number with new type
+                                        isCustomEquipment = !validateEquipment(
+                                            equipmentNumberValue,
+                                            equipmentType
+                                        )
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = viewModel.selectedEquipmentType == equipmentType,
+                                onClick = null // handled by the row's selectable
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Column {
+                                Text(
+                                    text = equipmentType.displayName,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+
+                                Text(
+                                    text = when (equipmentType) {
+                                        EquipmentType.CAEX_797F -> "Números de equipo: 301-339, 365, 366"
+                                        EquipmentType.CAEX_798AC -> "Números de equipo: 340-352"
+                                    },
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Equipment number field
         LabeledTextField(
-            value = equipmentValue,
+            value = equipmentNumberValue,
             onValueChange = { updateEquipmentValue(it) },
-            label = "Equipo (Formato: CAEX XXX)",
+            label = "Número de Equipo",
             isError = viewModel.equipmentError || isCustomEquipment,
             errorMessage = when {
-                viewModel.equipmentError -> "El equipo es obligatorio"
-                isCustomEquipment -> "Formato inválido o ID de CAEX no permitido (use 301-339, 365 o 366)"
+                viewModel.equipmentError -> "El número de equipo es obligatorio"
+                isCustomEquipment -> when (viewModel.selectedEquipmentType) {
+                    EquipmentType.CAEX_797F -> "Número inválido. Use 301-339, 365 o 366"
+                    EquipmentType.CAEX_798AC -> "Número inválido. Use 340-352"
+                }
                 else -> ""
             },
             keyboardOptions = KeyboardOptions(
-                capitalization = KeyboardCapitalization.Characters,
-                keyboardType = KeyboardType.Text,
+                keyboardType = KeyboardType.Number,
                 imeAction = ImeAction.Next
             )
         )
 
-        // Campo para el inspector
+        // Inspector field
         LabeledTextField(
             value = viewModel.inspection.inspector,
             onValueChange = { viewModel.updateInspector(it) },
@@ -255,7 +325,7 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             )
         )
 
-        // Campo para el supervisor
+        // Supervisor field
         LabeledTextField(
             value = viewModel.inspection.supervisor,
             onValueChange = { viewModel.updateSupervisor(it) },
@@ -269,7 +339,7 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
             )
         )
 
-        // Campo para el horómetro
+        // Horometer field
         NumericTextField(
             value = viewModel.inspection.horometer,
             onValueChange = { viewModel.updateHorometer(it) },
@@ -281,7 +351,7 @@ fun InitialInfoForm(viewModel: NewInspectionViewModel) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Botón para continuar
+        // Continue button
         PrimaryButton(
             text = "Continuar",
             onClick = { viewModel.proceedToNextStage() },

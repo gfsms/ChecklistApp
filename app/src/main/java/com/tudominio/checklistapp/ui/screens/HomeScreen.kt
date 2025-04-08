@@ -31,14 +31,13 @@ import com.tudominio.checklistapp.ui.viewmodels.NewInspectionViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
- * Pantalla principal que muestra las opciones principales de la aplicación:
- * - Nueva Inspección: Para iniciar una nueva inspección de equipo
- * - Revisar Historial: Para ver el historial de inspecciones previas
+ * Pantalla principal que muestra las opciones principales de la aplicación
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onNavigateToNewInspection: () -> Unit = {},
+    onNavigateToPostInspection: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToDebug: () -> Unit = {},
     viewModel: NewInspectionViewModel = viewModel()
@@ -96,14 +95,21 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Botón de Nueva Inspección
+                    // Botón de Control de Inicio de Intervención
                     MenuCardButton(
-                        title = "Nueva Inspección",
-                        description = "Iniciar una nueva inspección de CAEX. Complete el formulario y registre conformidades y no conformidades en los 8 ítems de revisión.",
+                        title = "Control de Inicio de Intervención",
+                        description = "Iniciar una inspección de ingreso del equipo al taller. Registre conformidades y no conformidades en los ítems de revisión.",
                         onClick = {
                             viewModel.resetInspection()
                             onNavigateToNewInspection()
                         }
+                    )
+
+                    // Botón de Entrega de Equipo Post Intervención
+                    MenuCardButton(
+                        title = "Entrega de Equipo Post Intervención",
+                        description = "Realizar una inspección de entrega de equipo. Verifique la resolución de hallazgos previos y registre su estado final.",
+                        onClick = onNavigateToPostInspection
                     )
 
                     // Botón de Revisar Historial
@@ -143,31 +149,31 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Text(
-                            text = "1. Para iniciar una nueva inspección, seleccione 'Nueva Inspección'.",
+                            text = "1. Para iniciar una inspección de ingreso, seleccione 'Control de Inicio de Intervención'.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
 
                         Text(
-                            text = "2. Complete la información básica del CAEX (equipo, inspector, supervisor, horómetro).",
+                            text = "2. Para inspección de salida, seleccione 'Entrega de Equipo Post Intervención'.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
 
                         Text(
-                            text = "3. Complete cada ítem del checklist, marcando como 'Conforme' o 'No Conforme' cada punto.",
+                            text = "3. Complete la información básica del CAEX y cada ítem del checklist.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
 
                         Text(
-                            text = "4. Para los puntos 'No Conformes', agregue comentarios y fotos como evidencia.",
+                            text = "4. Para los hallazgos, agregue comentarios y fotos como evidencia.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
 
                         Text(
-                            text = "5. Al finalizar, revise el resumen y genere el informe de inspección en PDF.",
+                            text = "5. Al finalizar, revise el resumen y genere el informe de inspección.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -176,7 +182,7 @@ fun HomeScreen(
 
                 // Pie de página
                 Text(
-                    text = "Versión 1.0.0",
+                    text = "Versión 1.1.0",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 24.dp)
